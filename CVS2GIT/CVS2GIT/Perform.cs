@@ -5,13 +5,14 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace CVS2GIT
 {
     class Perform
     {
-        string logPath, logName, blobname, dumpname, user, cvsDir, gitDir, command;                
-
+        string logPath, logName, blobname, dumpname, user, cvsDir, gitDir, command;
+        TextBox outputs;
         public Perform(Form1 control)
         {
             logPath = @"C:\temp\";
@@ -20,18 +21,35 @@ namespace CVS2GIT
             logPath += logName;
             File.CreateText(logPath).Dispose();
 
+            outputs = control.outputBox;
+
             blobname = "gblob.dat";
             dumpname = "gdump.dat";
             cvsDir = control.textBox1.Text;
             user = control.textBox2.Text;
             gitDir = control.textBox3.Text;
-
-            command = string.Format(@"python cvs2svn-2.4.0\cvs2git --blobfile={0} --dumpfile={1} --username={2} {3} --use-external-blob-generator"
+            #if DEBUG            
+                command = string.Format(@"python C:\cvs2svn-2.4.0\cvs2git --blobfile={0} --dumpfile={1} --username={2} {3} --use-external-blob-generator",
                                     blobname, dumpname, user, cvsDir);
-
+            #else
+                command = string.Format(@"python cvs2svn-2.4.0\cvs2git --blobfile={0} --dumpfile={1} --username={2} {3} --use-external-blob-generator",
+                                    blobname, dumpname, user, cvsDir);
+            #endif
         }
 
-        private bool doCMD(string cmd, string product, string action)
+        internal void Convert()
+        {
+            bool res = doCMD(command);
+            outputs.Text += "\r\n" + res.ToString();
+        }
+
+        internal void DisplayLines(string lines)
+        {
+            outputs.Text += lines;
+        }
+
+
+        private bool doCMD(string cmd)
         {
             ProcessStartInfo sinfo = new ProcessStartInfo();
             sinfo.FileName = @"C:\Windows\System32\cmd.exe";
@@ -45,9 +63,11 @@ namespace CVS2GIT
             exec.Start();
             exec.StandardInput.WriteLine(cmd);
             exec.StandardInput.WriteLine("exit");
-
+            
             StreamReader reader = exec.StandardOutput;
             string strOutput = reader.ReadToEnd();
+            outputs.Text += strOutput;
+
             using (StreamWriter file =
                 new StreamWriter(logPath, true))
             {

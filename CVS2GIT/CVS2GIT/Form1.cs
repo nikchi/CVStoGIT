@@ -15,12 +15,32 @@ namespace CVS2GIT
         public Form1()
         {
             InitializeComponent();
+            Perform run = new Perform(this);
+            //run.DisplayLines("test");
         }
 
         private void runButton_Click(object sender, EventArgs e)
         {
             Perform run = new Perform(this);
+            run.Convert();
+        }
 
+        private void button1_Click(object sender, EventArgs e)
+        {
+            FolderBrowserDialog cvs = new FolderBrowserDialog();
+            if (DialogResult.OK == cvs.ShowDialog())
+            {
+                textBox1.Text = cvs.SelectedPath;
+            }
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            FolderBrowserDialog git = new FolderBrowserDialog();
+            if (DialogResult.OK == git.ShowDialog())
+            {
+                textBox3.Text = git.SelectedPath;
+            }
         }
     }
 }
