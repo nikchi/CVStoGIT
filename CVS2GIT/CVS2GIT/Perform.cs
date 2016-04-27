@@ -50,9 +50,9 @@ namespace CVS2GIT
         internal void CreateGit()
         {
             doCMD("cd " + gitDir + " & git init");
-            doCMD("mv " + blobname + " " + gitDir + " & mv " + dumpname + " " + gitDir);
-            doCMD("cd " + gitDir + " & git fast-import --export-marks=gmarks.dat < " + blobname);
-            doCMD("cd " + gitDir + " & git fast-import --export-marks=gmarks.dat < " + dumpname);
+            doCMD("move " + blobname + " " + gitDir + " & move " + dumpname + " " + gitDir);
+            doCMD("cd " + gitDir + " & git fast-import --export-marks=git-marks.dat < " + blobname);
+            doCMD("cd " + gitDir + " & git fast-import --import-marks=git-marks.dat < " + dumpname);
             doCMD("cd " + gitDir + " & git gc --prune=now");
             doCMD("cd " + gitDir + " & git repack -a -d -f");
 
