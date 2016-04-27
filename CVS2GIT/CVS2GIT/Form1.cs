@@ -48,5 +48,11 @@ namespace CVS2GIT
             Perform run = new Perform(this);
             run.CreateGit();
         }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            Perform run = new Perform(this);
+            run.pushGit();
+        }
     }
 }

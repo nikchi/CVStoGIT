@@ -58,6 +58,12 @@ namespace CVS2GIT
 
         }
 
+        internal void pushGit()
+        {
+            doCMD("cd " + gitDir + " & git remote add origin " + remote);
+            doCMD("cd " + gitDir + " & git push origin master");
+        }
+
 
         internal void DisplayLines(string lines)
         {
