@@ -43,6 +43,7 @@
             this.button4 = new System.Windows.Forms.Button();
             this.textBox4 = new System.Windows.Forms.TextBox();
             this.label4 = new System.Windows.Forms.Label();
+            this.textBox5 = new System.Windows.Forms.TextBox();
             this.SuspendLayout();
             // 
             // button1
@@ -135,7 +136,7 @@
             this.runButton.Name = "runButton";
             this.runButton.Size = new System.Drawing.Size(192, 23);
             this.runButton.TabIndex = 8;
-            this.runButton.Text = "Run cvs2git";
+            this.runButton.Text = "Run CVStoGIT";
             this.runButton.UseVisualStyleBackColor = true;
             this.runButton.Click += new System.EventHandler(this.runButton_Click);
             // 
@@ -145,7 +146,7 @@
             this.outputBox.Multiline = true;
             this.outputBox.Name = "outputBox";
             this.outputBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.outputBox.Size = new System.Drawing.Size(334, 313);
+            this.outputBox.Size = new System.Drawing.Size(334, 323);
             this.outputBox.TabIndex = 9;
             // 
             // createGitButton
@@ -155,7 +156,7 @@
             this.createGitButton.Name = "createGitButton";
             this.createGitButton.Size = new System.Drawing.Size(192, 23);
             this.createGitButton.TabIndex = 10;
-            this.createGitButton.Text = "Create Git repo";
+            this.createGitButton.Text = "Create Git Repo";
             this.createGitButton.UseVisualStyleBackColor = true;
             this.createGitButton.Click += new System.EventHandler(this.createGitButton_Click);
             // 
@@ -189,11 +190,24 @@
             this.label4.Text = "Remote URL";
             this.label4.TextAlign = System.Drawing.ContentAlignment.TopRight;
             // 
+            // textBox5
+            // 
+            this.textBox5.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.textBox5.Enabled = false;
+            this.textBox5.Location = new System.Drawing.Point(352, 203);
+            this.textBox5.Multiline = true;
+            this.textBox5.Name = "textBox5";
+            this.textBox5.ReadOnly = true;
+            this.textBox5.Size = new System.Drawing.Size(277, 132);
+            this.textBox5.TabIndex = 14;
+            this.textBox5.Text = resources.GetString("textBox5.Text");
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(641, 337);
+            this.Controls.Add(this.textBox5);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.textBox4);
             this.Controls.Add(this.button4);
@@ -235,6 +249,7 @@
         private System.Windows.Forms.Button button4;
         internal System.Windows.Forms.TextBox textBox4;
         private System.Windows.Forms.Label label4;
+        internal System.Windows.Forms.TextBox textBox5;
     }
 }
 
