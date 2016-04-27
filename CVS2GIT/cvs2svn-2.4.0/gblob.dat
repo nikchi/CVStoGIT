@@ -1,0 +1,1374 @@
+blob
+mark :1
+data 5512
+Ôªøusing System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+namespace ContextStack
+{
+    public class UsingStackObj : IDisposable
+    {
+        public bool catching { get; set; }
+        public string activity { get; set; }
+        public IStateAware state { get; set; }
+        public UsingStackObj(IStateAware sta, string optact = "", bool optcat = false)
+        {
+            state = sta;
+            catching = optcat;
+            activity = optact;
+
+            UsingStack.Instance.PushIn(this);
+        }
+        public override string ToString()
+        {
+            string ret = "\r\n";
+            return ret + catching.ToString() + "\r\n"
+                        + activity + "\r\n"
+                        + state.GetState();
+        }
+        public UsingStackObj MakeClone()    
+        {
+            return (UsingStackObj)this.MemberwiseClone();
+        }
+
+        public void Dispose()
+        {
+            bool isInException = Marshal.GetExceptionPointers() != IntPtr.Zero || Marshal.GetExceptionCode() != 0;
+            if (isInException && (UsingStack.Instance.TempCount() == 0))
+            {
+                UsingStack.Instance.ExceptionCopy();
+            }
+            UsingStack.Instance.PopOut();
+        }
+
+    }
+
+    public class UsingStack
+    {
+
+        ///<summary>
+        /// <para>
+        /// To implement, wrap body of function in using
+        /// <code>
+        /// public void func()
+        /// {
+        ///     using (new UsingStackObj(this, "activity"))
+        ///     {
+        ///         //functionstuffhere
+        ///     }
+        /// }
+        /// </code>
+        /// activity is a string that gives some type of context
+        /// MethodBase.GetCurrentMethod().Name can be used in place of a string when lazy
+        /// </para>
+        ///</summary>
+        private ThreadLocal<Stack<UsingStackObj>> CurrentActivity = new ThreadLocal<Stack<UsingStackObj>>(() => new Stack<UsingStackObj>());
+        private ThreadLocal<Stack<UsingStackObj>> TempStack = new ThreadLocal<Stack<UsingStackObj>>(() => new Stack<UsingStackObj>());
+
+        public int GetCount() { return CurrentActivity.Value.Count; }
+        public int TempCount() { return TempStack.Value.Count; }
+        public void ExceptionCopy()
+        {
+            foreach (var frame in CurrentActivity.Value)
+            {
+                TempStack.Value.Push(frame.MakeClone());
+            }
+        }
+
+        public void PushIn(IStateAware sta, string optact = "", bool optcat = false)
+        {
+            CurrentActivity.Value.Push(new UsingStackObj(sta, optact, optcat));
+        }
+        public void PushIn(UsingStackObj frame)
+        {
+            CurrentActivity.Value.Push(frame);
+        }
+        public UsingStackObj PopOut()
+        {
+            if (CurrentActivity.Value.Count != 0)
+                return CurrentActivity.Value.Pop();
+            else
+                return null;
+        }
+
+        /// <summary>
+        /// <para>
+        /// To update the activity string within a function
+        /// <code>UsingStack.Instance.Update("activity String")</code>
+        /// </para>
+        /// </summary>
+        /// <param name="act"></param>
+        public void Update(string act)
+        {
+            if (CurrentActivity.Value.Count != 0)
+                PeekTop().activity = act;
+
+        }
+        public UsingStackObj PeekTop()
+        {
+            if (CurrentActivity.Value.Count != 0)
+                return CurrentActivity.Value.Peek();
+            else
+                return null;
+        }
+        public string PeekTop(string act)
+        {
+            return CurrentActivity.Value.Peek().activity = act;
+        }
+
+        /// <summary>
+        /// <code>UsingStack.Instance.ExceptionBuilder(ex)</code>
+        /// </summary>
+        /// <param name="ex"></param>
+        /// <returns>this will give a formatted context+state aware trace </returns>
+        public string ExceptionBuilder(Exception ex)
+        {
+            string value = "";
+            UsingStackObj temp;
+            int unwind = 0;
+            string stateAtError = TempStack.Value.Peek().state.GetState();
+            value += "\r\nState when Exception Occurred : " + stateAtError;
+            while ((0 != TempStack.Value.Count) && (TempStack.Value.Peek() != null))
+            {
+                temp = TempStack.Value.Pop();
+                value += "\r\n\t " + unwind +
+                    "\r\n\t\t" + " Activity: " + temp.activity;
+                if (!temp.state.GetState().Equals(stateAtError))
+                {
+                    value += "\r\n\t\t" + " State: " + temp.state.GetState();
+                    stateAtError = temp.state.GetState();
+                }
+                unwind++;
+            }
+            if (TempStack.Value.Count != 0)
+            {
+                temp = TempStack.Value.Pop();
+                value += "\r\n\t " + unwind +
+                    "\r\n\t\t" + " Activity: " + temp.activity;
+                if (!temp.state.GetState().Equals(stateAtError))
+                {
+                    value += "\r\n\t\t" + " State: " + temp.state.GetState();
+                    stateAtError = temp.state.GetState();
+                }
+            }
+            value += "\r\n" + ex.Message;
+
+            return value;
+        }
+
+        private static UsingStack contextStack = new UsingStack();
+        public static UsingStack Instance
+        {
+            get { return contextStack; }
+        }
+    }
+}
+
+blob
+mark :2
+data 7087
+Ôªøusing System;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+namespace ContextStack
+{
+    public class MIACContext : IDisposable, ICloneable
+    {
+        public String Activity { get; set; }
+        public IStateAware State { get; private set; }
+
+        public MIACContext(IStateAware state, String activity = "")
+        {
+            State = state;
+            Activity = activity;
+            ExecutionContextStack.Instance.PushIn(this);
+        }
+<<<<<<< UsingStack.cs
+        public UsingStackObj MakeClone()    
+=======
+
+        public override String ToString()
+>>>>>>> 1.2
+        {
+            return String.Format("\r\n{0}\r\n{1}", Activity, State.GetState());
+        }
+
+        public void Dispose()
+        {
+            if (Marshal.GetExceptionPointers() != IntPtr.Zero || Marshal.GetExceptionCode() != 0)
+                ExecutionContextStack.Instance.MoveToErrorStack(this);
+            ExecutionContextStack.Instance.PopOut(this);
+        }
+
+        public object Clone()
+        {
+            return MemberwiseClone();
+        }
+    }
+
+    public class ExecutionContextStack
+    {
+        ///<summary>
+        /// <para>
+        /// To implement, wrap body of function in using
+        /// <code>
+        /// public void func()
+        /// {
+        ///     using (var conext = new MIACContext(this, "activity"))
+        ///     {
+        ///         //functionstuffhere
+        ///         conext.Activity = "New activity";
+        ///         ...
+        ///         conext.Activity = "Other activity";
+        ///     }
+        /// }
+        /// </code>
+        /// activity is a string that gives some type of context
+        /// MethodBase.GetCurrentMethod().Name can be used in place of a string when lazy
+        /// </para>
+        ///</summary>
+        private Stack<MIACContext> ErrorContextStack
+        {
+            get
+            {
+                return tempStack.Value;
+
+            }
+            set
+            {
+                tempStack.Value = value;
+            }
+        }
+        private Stack<MIACContext> ActivityStack
+        {
+            get
+            {
+                return currentActivity.Value;
+
+            }
+            set
+            {
+                currentActivity.Value = value;
+            }
+        }
+        private ThreadLocal<Stack<MIACContext>> currentActivity = new ThreadLocal<Stack<MIACContext>>(() => new Stack<MIACContext>());
+        private ThreadLocal<Stack<MIACContext>> tempStack = new ThreadLocal<Stack<MIACContext>>(() => new Stack<MIACContext>());
+
+        internal void PushIn(MIACContext frame)
+        {
+            ActivityStack.Push(frame);
+        }
+
+        internal void MoveToErrorStack(MIACContext frame)
+        {
+            if (ActivityStack.Count != 0 && ActivityStack.Peek() == frame)
+                ErrorContextStack.Push(frame.Clone() as MIACContext);
+        }
+
+<<<<<<< UsingStack.cs
+        /// <summary>
+        /// <para>
+        /// To update the activity string within a function
+        /// <code>UsingStack.Instance.Update("activity String")</code>
+        /// </para>
+        /// </summary>
+        /// <param name="act"></param>
+        public void Update(string act)
+        {
+            if (CurrentActivity.Value.Count != 0)
+                PeekTop().activity = act;
+
+        }
+        public UsingStackObj PeekTop()
+        {
+            if (CurrentActivity.Value.Count != 0)
+                return CurrentActivity.Value.Peek();
+            else
+                return null;
+        }
+        public string PeekTop(string act)
+=======
+        internal void PopOut(MIACContext frame)
+>>>>>>> 1.2
+        {
+            if (ActivityStack.Count != 0 && ActivityStack.FirstOrDefault(context => context == frame) != null)
+                while (ActivityStack.Pop() != frame) ;
+        }
+
+        /// <summary>
+        /// <code>UsingStack.Instance.ExceptionBuilder(ex)</code>
+        /// </summary>
+        /// <param name="ex"></param>
+        /// <returns>this will give a formatted context+state aware trace </returns>
+        public String ExceptionBuilder(Exception ex)
+        {
+<<<<<<< UsingStack.cs
+            string value = "";
+            UsingStackObj temp;
+=======
+            string value = "\r\n" + ex.Message;
+            MIACContext temp;
+>>>>>>> 1.2
+            int unwind = 0;
+            string stateAtError = tempStack.Value.Peek().State.GetState();
+            value += "\r\nState when Exception Occurred : " + stateAtError;
+            while ((0 != tempStack.Value.Count) && (tempStack.Value.Peek() != null))
+            {
+<<<<<<< UsingStack.cs
+                temp = TempStack.Value.Pop();
+                value += "\r\n\t " + unwind +
+                    "\r\n\t\t" + " Activity: " + temp.activity;
+                if (!temp.state.GetState().Equals(stateAtError))
+=======
+                temp = tempStack.Value.Pop();
+                value += "\r\n\t Steps From Exception: " + unwind +
+                    "\r\n\t\t" + " Activity: " + temp.Activity;
+                if (!temp.State.GetState().Equals(stateAtError))
+>>>>>>> 1.2
+                {
+                    value += "\r\n\t\t" + " State: " + temp.State.GetState();
+                    stateAtError = temp.State.GetState();
+                }
+                unwind++;
+            }
+            if (tempStack.Value.Count != 0)
+            {
+<<<<<<< UsingStack.cs
+                temp = TempStack.Value.Pop();
+                value += "\r\n\t " + unwind +
+                    "\r\n\t\t" + " Activity: " + temp.activity;
+                if (!temp.state.GetState().Equals(stateAtError))
+=======
+                temp = tempStack.Value.Pop();
+                value += "\r\n\t Steps From Exception: " + unwind +
+                    "\r\n\t\t" + " Activity: " + temp.Activity;
+                if (!temp.State.GetState().Equals(stateAtError))
+>>>>>>> 1.2
+                {
+                    value += "\r\n\t\t" + " State: " + temp.State.GetState();
+                    stateAtError = temp.State.GetState();
+                }
+            }
+<<<<<<< UsingStack.cs
+            value += "\r\n" + ex.Message;
+=======
+            return value;
+        }
+>>>>>>> 1.2
+
+        public String GetExceptionContext(Exception ex)
+        {
+            int unwind = 0;
+            String contextString = "\n" + ex.Message + "\nState when Exception Occurred : " + ErrorContextStack.Peek().ToString();
+            foreach (var context in ErrorContextStack)
+                contextString += "\n\t Steps From Exception: " + unwind++ + new String(' ', unwind) + "\t\t Activity: " + context.Activity;
+            foreach (var state in ErrorContextStack.Select(c => c.State).Distinct())
+                contextString += "\n\t\t State: " + state.GetState();
+            ErrorContextStack.Clear();
+            return contextString;
+        }
+
+        private static ExecutionContextStack contextStack = new ExecutionContextStack();
+        public static ExecutionContextStack Instance
+        {
+            get { return contextStack; }
+        }
+    }
+}
+
+blob
+mark :3
+data 2454
+Ôªø<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{C7621EED-73A1-4C24-9259-B9AF6A8062C0}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>ClassLibrary2</RootNamespace>
+    <AssemblyName>ClassLibrary2</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="IStateAware.cs" />
+    <Compile Include="UsingStack.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
+blob
+mark :4
+data 370
+Ôªønamespace ContextStack
+{
+    public interface IStateAware
+    {
+        /// <summary>
+        /// Returns whatever is important to the error message.
+        /// TODO have integer or enum to indicate the amount of data to provide
+        /// </summary>
+        /// <returns>String representing current state of the object</returns>
+        string GetState(); 
+    }
+}
+blob
+mark :5
+data 5587
+Ôªøusing System;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+namespace ContextStack
+{
+    public class MIACContext : IDisposable, ICloneable
+    {
+        public String Activity { get; set; }
+        public IStateAware State { get; private set; }
+
+        public MIACContext(IStateAware state, String activity = "")
+        {
+            State = state;
+            Activity = activity;
+            ExecutionContextStack.Instance.PushIn(this);
+        }
+
+        public override String ToString()
+        {
+            return String.Format("\r\n{0}\r\n{1}", Activity, State.GetState());
+        }
+
+        public void Dispose()
+        {
+            if (Marshal.GetExceptionPointers() != IntPtr.Zero || Marshal.GetExceptionCode() != 0)
+                ExecutionContextStack.Instance.MoveToErrorStack(this);
+            ExecutionContextStack.Instance.PopOut(this);
+        }
+
+        public object Clone()
+        {
+            return MemberwiseClone();
+        }
+    }
+
+    public class ExecutionContextStack
+    {
+        ///<summary>
+        /// <para>
+        /// To implement, wrap body of function in using
+        /// <code>
+        /// public void func()
+        /// {
+        ///     using (var conext = new MIACContext(this, "activity"))
+        ///     {
+        ///         //functionstuffhere
+        ///         conext.Activity = "New activity";
+        ///         ...
+        ///         conext.Activity = "Other activity";
+        ///     }
+        /// }
+        /// </code>
+        /// activity is a string that gives some type of context
+        /// MethodBase.GetCurrentMethod().Name can be used in place of a string when lazy
+        /// </para>
+        ///</summary>
+        private Stack<MIACContext> ErrorContextStack
+        {
+            get
+            {
+                return tempStack.Value;
+
+            }
+            set
+            {
+                tempStack.Value = value;
+            }
+        }
+        private Stack<MIACContext> ActivityStack
+        {
+            get
+            {
+                return currentActivity.Value;
+
+            }
+            set
+            {
+                currentActivity.Value = value;
+            }
+        }
+        private ThreadLocal<Stack<MIACContext>> currentActivity = new ThreadLocal<Stack<MIACContext>>(() => new Stack<MIACContext>());
+        private ThreadLocal<Stack<MIACContext>> tempStack = new ThreadLocal<Stack<MIACContext>>(() => new Stack<MIACContext>());
+
+        internal void PushIn(MIACContext frame)
+        {
+            ActivityStack.Push(frame);
+        }
+
+        internal void MoveToErrorStack(MIACContext frame)
+        {
+            if (ActivityStack.Count != 0 && ActivityStack.Peek() == frame)
+                ErrorContextStack.Push(frame.Clone() as MIACContext);
+        }
+
+        internal void PopOut(MIACContext frame)
+        {
+            if (ActivityStack.Count != 0 && ActivityStack.FirstOrDefault(context => context == frame) != null)
+                while (ActivityStack.Pop() != frame) ;
+        }
+
+        /// <summary>
+        /// <code>UsingStack.Instance.ExceptionBuilder(ex)</code>
+        /// </summary>
+        /// <param name="ex"></param>
+        /// <returns>this will give a formatted context+state aware trace </returns>
+        public String ExceptionBuilder(Exception ex)
+        {
+            string value = "\r\n" + ex.Message;
+            MIACContext temp;
+            int unwind = 0;
+            string stateAtError = tempStack.Value.Peek().State.GetState();
+            value += "\r\nState when Exception Occurred : " + stateAtError;
+            while ((0 != tempStack.Value.Count) && (tempStack.Value.Peek() != null))
+            {
+                temp = tempStack.Value.Pop();
+                value += "\r\n\t Steps From Exception: " + unwind +
+                    "\r\n\t\t" + " Activity: " + temp.Activity;
+                if (!temp.State.GetState().Equals(stateAtError))
+                {
+                    value += "\r\n\t\t" + " State: " + temp.State.GetState();
+                    stateAtError = temp.State.GetState();
+                }
+                unwind++;
+            }
+            if (tempStack.Value.Count != 0)
+            {
+                temp = tempStack.Value.Pop();
+                value += "\r\n\t Steps From Exception: " + unwind +
+                    "\r\n\t\t" + " Activity: " + temp.Activity;
+                if (!temp.State.GetState().Equals(stateAtError))
+                {
+                    value += "\r\n\t\t" + " State: " + temp.State.GetState();
+                    stateAtError = temp.State.GetState();
+                }
+            }
+            return value;
+        }
+
+        public String GetExceptionContext(Exception ex)
+        {
+            int unwind = 0;
+            String contextString = "\n" + ex.Message + "\nState when Exception Occurred : " + ErrorContextStack.Peek().ToString();
+            foreach (var context in ErrorContextStack)
+                contextString += "\n\t Steps From Exception: " + unwind++ + new String(' ', unwind) + "\t\t Activity: " + context.Activity;
+            foreach (var state in ErrorContextStack.Select(c => c.State).Distinct())
+                contextString += "\n\t\t State: " + state.GetState();
+            ErrorContextStack.Clear();
+            return contextString;
+        }
+
+        private static ExecutionContextStack contextStack = new ExecutionContextStack();
+        public static ExecutionContextStack Instance
+        {
+            get { return contextStack; }
+        }
+    }
+}
+
+blob
+mark :6
+data 1570
+Ôªøusing System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
+// General Information about an assembly is controlled through the following 
+// set of attributes. Change these attribute values to modify the information
+// associated with an assembly.
+[assembly: AssemblyTitle("ClassLibrary2")]
+[assembly: AssemblyDescription("")]
+[assembly: AssemblyConfiguration("")]
+[assembly: AssemblyCompany("")]
+[assembly: AssemblyProduct("ClassLibrary2")]
+[assembly: AssemblyCopyright("Copyright ¬©  2016")]
+[assembly: AssemblyTrademark("")]
+[assembly: AssemblyCulture("")]
+
+// Setting ComVisible to false makes the types in this assembly not visible 
+// to COM components.  If you need to access a type in this assembly from 
+// COM, set the ComVisible attribute to true on that type.
+[assembly: ComVisible(false)]
+
+// The following GUID is for the ID of the typelib if this project is exposed to COM
+[assembly: Guid("c7621eed-73a1-4c24-9259-b9af6a8062c0")]
+
+// Version information for an assembly consists of the following four values:
+//
+//      Major Version
+//      Minor Version 
+//      Build Number
+//      Revision
+//
+// You can specify all the values or you can default the Build and Revision Numbers 
+// by using the '*' as shown below:
+// [assembly: AssemblyVersion("1.0.*")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: InternalsVisibleTo("ContextStack.Tests")]
+[assembly: InternalsVisibleTo("ClassLibrary2.Explorables")]
+[assembly: InternalsVisibleTo("ContextStack.Tests1")]
+
+
+blob
+mark :7
+data 1402
+Ôªøusing System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
+// General Information about an assembly is controlled through the following 
+// set of attributes. Change these attribute values to modify the information
+// associated with an assembly.
+[assembly: AssemblyTitle("ClassLibrary2")]
+[assembly: AssemblyDescription("")]
+[assembly: AssemblyConfiguration("")]
+[assembly: AssemblyCompany("")]
+[assembly: AssemblyProduct("ClassLibrary2")]
+[assembly: AssemblyCopyright("Copyright ¬©  2016")]
+[assembly: AssemblyTrademark("")]
+[assembly: AssemblyCulture("")]
+
+// Setting ComVisible to false makes the types in this assembly not visible 
+// to COM components.  If you need to access a type in this assembly from 
+// COM, set the ComVisible attribute to true on that type.
+[assembly: ComVisible(false)]
+
+// The following GUID is for the ID of the typelib if this project is exposed to COM
+[assembly: Guid("c7621eed-73a1-4c24-9259-b9af6a8062c0")]
+
+// Version information for an assembly consists of the following four values:
+//
+//      Major Version
+//      Minor Version 
+//      Build Number
+//      Revision
+//
+// You can specify all the values or you can default the Build and Revision Numbers 
+// by using the '*' as shown below:
+// [assembly: AssemblyVersion("1.0.*")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+
+blob
+mark :8
+data 8704
+MZê       ˇˇ  ∏       @                                   Ä   ∫ ¥	Õ!∏LÕ!This program cannot be run in DOS mode.
+$       PE  L cö˙V        ‡ " 0           Z9       @                           Ä          `Ö                           9  O    @  ò                   `     –7                                                               H           .text   `                           `.rsrc   ò   @                    @  @.reloc      `                     @  B                <9      H     ¯%  ÿ                                                         {  *"}  *{  *"}  *ñ(  
+  (   (   (  o   *0 !      r  p(  (  o  (  
+
++ *   0 :      (  
+~  
+(  
+-
+(  
+˛+
+,(  o   (  o   *  0       (  
+
++ *0       {  o  
+
++ *> {  o  
+ *   0       {  o  
+
++ *> {  o  
+ *> (  o  
+ *   0 ;      (  o  
+,(  o  
+˛+
+,(
+  o	  u  o  
+ * 0 Z     s  
+}   (  o  
+,(  ˛  s  
+(  +˛+,+ (  o  
+{  ˛˛-Â*  0 ¢     r  po   
+(!  
+
+{  o  
+o  
+o  o  r  p	("  
+
+8à    {  o  
+o  
+ç  %¢%rc  p¢%å"  ¢%rô  p¢%o  ¢(#  
+
+o  o  	o$  
+˛,% rπ  po  o  ("  
+
+o  o   X {  o  
+o  
+,{  o  
+o  
+˛+:Gˇˇˇ{  o  
+o  
+˛9Ñ    {  o  
+o  
+ç  %¢%rc  p¢%å"  ¢%rô  p¢%o  ¢(#  
+
+o  o  	o$  
+˛,% rπ  po  o  ("  
+
+o  o    + *  0      
+r”  po   
+r◊  p(
+  o  
+o%  
+(&  
+ (
+  o'  
++I((  
+ç  %¢%r p¢%%X
+å"  ¢% s)  
+¢%rO p¢%	o  ¢(#  
+(*  
+-Æﬁ˛  o+  
+ ‹ (
+  ~  %-&~  ˛  s,  
+%Ä  (  +(  +o/  
++o0  
+rk po  ("  
+o1  
+-€ﬁ,o+  
+ ‹(
+  o2  
+ + *   6 Vå      “ )˚     0       ~  
++ * 0 \       ~	  %-&~  ˛  s3  
+%Ä	  s4  
+}  ~
+  %-&~  ˛  s3  
+%Ä
+  s4  
+}  (  
+ *.s  Ä  *"(  
+ **{  ˛*.s  Ä  *o  *s5  
+* BSJB         v4.0.30319     l   h  #~  ‘  h  #Strings    <  Ñ  #US ¿     #GUID   –    #Blob         W¢		
+   ˙3      #      
+            5                  	                    |      D pD  d   _ú Êú «ú Wú #ú <ú vú K% % ™ú ëπ ∞é wé aé ÛD Õ 0 ö ®
+ í Î  Æé_ Û   ® Î  º é } é ’é t% é l¡ Ñ Î  ∂ é ‰z    ’       °   ô1      ¸1A     ¸1A  
+     A   ! Á   A    } Ä OÑ ·Ñ >ê Éî6 — ò  ú > ¶ d ¶      ∆‰≠  P     Ü5≠  X     ÜB  a     Üπ≤ i     Å√∑ r     Ü˛Ω ò     ∆ ”≠  »     Ê±  !    ÊìD  (!    Åƒ E!    Å(Õ X!    ÅKƒ u!    Å]Õ Ö!    É ï◊ ò!    É Î◊ ‡!    É Ï◊	 H"    Ü ”›
+ ¯#    Ü › <%    ñ7„ T%    Ü˛  º%    ëË »%    Ü˛  —%    É W Ï ‹%    ëË »%    Ü˛  Ë%    É ! Ú %    É H ƒ %    É n ƒ    ¢   ¢   Ì _   ¢   ¢   É   É   É   $   $       E  I 	 ˛  ˛  ˛
+ ) ˛ 1 ˛ 9 ˛ A ˛ I ˛ Q ˛ Y ˛ a ˛ i ˛ q ˛ y ˛ ô ˛ © ˛ Å ˛ È ©$ Ò ç/ ˘ ∏3 ˘ '6 Ò D< Å âD  é\  òa  ‹a  ‚n  o\  ˛Å «á  Ω\ ¡ U≠ È ¢± È ¢∑ È ¢æ È sƒ Å ”≠ È ¢ﬂ  Á $ ÷\ È ˛˜ $ Û˝ â ± , ˛Å ∑
+æ+4 J< ÷\ Û˝  Õ D ˛Å  ˛j ˛     ! { ˜! É ¸.  .  .  8. # A. + T. 3 T. ; T. C A. K Z. S T. [ T. c r. k ú. s ©@ { ˜A { ˜A É ¸` { ˜Ä { ˜† { ˜£ { ˜√ { ˜  + @ H r † … Z      V˘  Á˝  ,  a  ;             
+       	   	    Q g y  BS_Ä               √              tﬁ                té               t•        = õ [ $] =     <>c__DisplayClass10_0 <>9__12_0 <GetExceptionContext>b__12_0 <>9__16_0 <.ctor>b__16_0 <PopOut>b__0 <>9__16_1 <.ctor>b__16_1 Func`1 IEnumerable`1 Stack`1 ThreadLocal`1 IEnumerator`1 Int32 Func`2 ClassLibrary2 <>9 <Module> mscorlib <>c System.Collections.Generic <State>k__BackingField <Activity>k__BackingField get_Instance GetExceptionCode get_Message ICloneable Enumerable IDisposable frame MemberwiseClone IStateAware System.Core Dispose get_State set_State DebuggerBrowsableState GetState state CompilerGeneratedAttribute GuidAttribute DebuggableAttribute DebuggerBrowsableAttribute ComVisibleAttribute AssemblyTitleAttribute AssemblyTrademarkAttribute TargetFrameworkAttribute AssemblyFileVersionAttribute AssemblyConfigurationAttribute AssemblyDescriptionAttribute CompilationRelaxationsAttribute AssemblyProductAttribute AssemblyCopyrightAttribute AssemblyCompanyAttribute RuntimeCompatibilityAttribute get_Value set_Value value System.Threading System.Runtime.Versioning ToString Push tempStack MoveToErrorStack ExecutionContextStack get_ErrorContextStack set_ErrorContextStack contextStack get_ActivityStack set_ActivityStack Peek Marshal ClassLibrary2.dll System PushIn System.Reflection Exception Zero Pop System.Linq Clear ExceptionBuilder IEnumerator GetEnumerator .ctor .cctor IntPtr System.Diagnostics System.Runtime.InteropServices System.Runtime.CompilerServices DebuggingModes Equals System.Collections GetExceptionPointers Concat Format Object Select Distinct FirstOrDefault get_Current get_Count PopOut MoveNext MIACContext GetExceptionContext context ex op_Inequality get_Activity set_Activity currentActivity activity   
+ { 0 }  
+ { 1 }   
+  E 
+ S t a t e   w h e n   E x c e p t i o n   O c c u r r e d   :    5 
+ 	   S t e p s   F r o m   E x c e p t i o n :     
+ 	 	   A c t i v i t y :     
+ 	 	   S t a t e :    
+  C
+ S t a t e   w h e n   E x c e p t i o n   O c c u r r e d   :    3
+ 	   S t e p s   F r o m   E x c e p t i o n :    	 	   A c t i v i t y :    
+ 	 	   S t a t e :     ù^íá◊ÍàJΩÄu
+.÷S        Q        ]
+Y]     ]  m  ÄÖ m 
+	      ei   e e   mÄÖÄÖ m 
+ÄÖ ÄÖ 
+ÄÖ  i i
+q]	 q ∑z\V4‡âY]	mq]      ]	 ]  a      ( ( ( ]         TWrapNonExceptionThrows      ClassLibrary2       Copyright ¬©  2016  ) $c7621eed-73a1-4c24-9259-b9af6a8062c0   1.0.0.0  M .NETFramework,Version=v4.5.2 TFrameworkDisplayName.NET Framework 4.5.2                 cö˙V         Ï7  Ï  RSDSU#	µù?JíˇLxVÍ)·   C:\Develop\Vision\ContextStack\obj\Debug\ClassLibrary2.pdb                                                                                                                                                                                                          09          J9                          <9            _CorDllMain mscoree.dll     ˇ%                                                                                                                                                                                       Ä                  0  Ä                   H   X@  <          <4   V S _ V E R S I O N _ I N F O     ΩÔ˛                 ?                         D    V a r F i l e I n f o     $    T r a n s l a t i o n       ∞ú   S t r i n g F i l e I n f o   x   0 0 0 0 0 4 b 0      C o m m e n t s       "   C o m p a n y N a m e         D   F i l e D e s c r i p t i o n     C l a s s L i b r a r y 2   0   F i l e V e r s i o n     1 . 0 . 0 . 0   D   I n t e r n a l N a m e   C l a s s L i b r a r y 2 . d l l   H   L e g a l C o p y r i g h t   C o p y r i g h t   ©     2 0 1 6   *   L e g a l T r a d e m a r k s         L   O r i g i n a l F i l e n a m e   C l a s s L i b r a r y 2 . d l l   <   P r o d u c t N a m e     C l a s s L i b r a r y 2   4   P r o d u c t V e r s i o n   1 . 0 . 0 . 0   8   A s s e m b l y   V e r s i o n   1 . 0 . 0 . 0                                                                                                                0     \9                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+blob
+mark :9
+data 19968
+Microsoft C/C++ MSF 7.00
+DS         '   ƒ       %                                                                                                                                                                                                                                                                                                                                                                                                                                                                           ¿ˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇ8   ¿ˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇ 18              ˇˇ   ˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  18              ˇˇ   ˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 î.1cö˙V   U#	µù?JíˇLxVÍ)·                          ‹Q3                                                                                                                                                                                                                                                                                                                                                                                                                                                                     18             ˇˇˇˇ   ˇˇ     ˇˇˇˇ    ˇˇˇˇ    ˇˇˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                         18             ˇˇˇˇ   ˇˇ     ˇˇˇˇ    ˇˇˇˇ    ˇˇˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ¯bQ?∆”êS ¿O£°ƒEKôÈÊ“ê? ¿O£°ùÜZf”Ω*  ¯IΩÏˇ^™Má˜oIcÉ4`       Ecæÿ∞oöKDX1õéIŸü∫                                                                                                                                                                                                                                                                                                                                                                                                                                            €      €                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ˛Ô˛Ô   \    C:\Develop\Vision\ContextStack\UsingStack.cs  c:\develop\vision\contextstack\usingstack.cs    .   /                                                                                                                                                                                                                                                                                                                                                                                                             ‚0Ä   ∞J?‘Ãâ—                                                               /   (   ‚0Fíæk\      .   /   e                                                                                                                                                                                                                                                                                                                                                                                                              F *    |                    »      <GetExceptionContext>b__12_0   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    Ë                    œ      <.ctor>b__16_0 . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    T                   ’      <.ctor>b__16_1 . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $   »                     î  ÄA H Ú   $   œ                     T  Äm Ö Ú   $   ’                     U  Äg  Ù                    ,   D   d   |   ú                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              6 *    <                            get_Activity     6 *    x                           set_Activity     2 *    ∞                           get_State    2 *    Ë                           set_State    . *    Ë      %                    .ctor   Ï   ∞  %         
+ $USystem  $USystem.Linq     $USystem.Collections.Generic " $USystem.Runtime.InteropServices  $USystem.Threading     2 …?Í∆≥Y÷Iº%	ª´¥`    M D 2                   2 *    \      !             C       ToString   : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    2 *    –      :             d       Dispose    : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    . *    @                 	  û       Clone  : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    Ú   $                            Ä" & Ú   $                           Ä' + Ú   $                           Ä$ ( Ú   $                           Ä) 5 Ú   `        %          T         Ä     Ä     Ä     Ä     Ä$     Ä	 D 	 
+    !  9 	 
+ Ú   <   C     !          0         Ä     Ä     Ä	 
+  P 	 
+ Ú   `   d     :          T         Ä     Ä   ÓÔ˛Ä!     Ä-     Ä9     Ä	 
+  b      G  9 	 
+ Ú   <   û               0       "  Ä   #  Ä
+   $  Ä	 
+  & 	 
+ Ù             @   ¥   –   Ë       4  L  d  |  ê  ®  ¿  ÿ                                                                                                           6 *    l       
+             æ      <PopOut>b__0   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $   æ    
+                 d  ÄU e Ù                4  P                                                                                                                                                                                                                                                                                                                                             > *    Ä                  
+  ™       get_ErrorContextStack  : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    > *    Ù                    ª       set_ErrorContextStack  . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              : *    p                           get_ActivityStack  : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    : *    ‡                   €       set_ActivityStack  . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    D                   Í       PushIn . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              : *    ¿      ;             ˘       MoveToErrorStack   : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    . *    Ñ      Z             4      PopOut  ƒ  0  Z   4     "                CS$<>8__locals0   N …?Í∆≥Y÷Iº%	ª´¥`    M D 2                ÄÑ     X    : *    ®      ¢            é      ExceptionBuilder    à  T  ¢  é                     value                  temp                   unwind  "               stateAtError      N …?Í∆≥Y÷Iº%	ª´¥`    M D 2                 MdÄÑÇ4ÅÉLÑA   > *                      0      GetExceptionContext     ¨  ¥    0                     unwind  "               contextString    Ï  x  I   h                    context    Ï  ∞                         state       Z …?Í∆≥Y÷Iº%	ª´¥`    M D 2                4Ä±Ä±ÅvÅv       Å™    6 *    å                   L      get_Instance   : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    . *           \             W      .ctor  > …?Í∆≥Y÷Iº%	ª´¥`    M D 2                ^  E   . *    d                   ≥      .cctor . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   <   ™               0       ?  Ä   @  Ä   B  Ä   (   Ú   <   ª               0       D  Ä   E  Ä   F  Ä   )   Ú   <                   0       K  Ä   L  Ä   N  Ä   .   Ú   <   €               0       P  Ä   Q  Ä   R  Ä   /   Ú   <   Í               0       X  Ä   Y  Ä   Z  Ä	 
+  ' 	 
+ Ú   T   ˘     ;          H       ]  Ä   ^  Ä    ÓÔ˛Ä#   _  Ä:   `  Ä	 
+  K      F 	 
+ Ú   Ñ   4    Z       	   x       ÓÔ˛Ä   c  Ä   d  Ä9   ÓÔ˛Ä<   ÓÔ˛Ä>   e  Ä?   e  ÄV   ÓÔ˛ÄY   f  Ä    	 
+  o         6 7  5     	 
+ Ú   §  é    ¢      !   ò      n  Ä   o  Ä   q  Ä   r  Ä/   s  Ä<   ÓÔ˛ÄA   u  ÄB   v  ÄS   w  ÅÖ   y  Äõ   ÓÔ˛Äü   z  Ä†   {  Ä∑   |  Ä√   }  Äƒ   ~  Ä»     Ä…   t  ÄÛ   ÓÔ˛Ä˙   Ä  Ä  ÓÔ˛Ä  Å  Ä  Ç  Ä(  É  ÅZ  Ö  Äp  ÓÔ˛Ät  Ü  Äu  á  Äå  à  Äò  â  Äô  ä  Äö  ã  Äü  å  Ä	 
+  0    K  L        .  @  A        N  :        U      ,        .  @  A        N  :       	 
+ Ú     0             ¸       è  Ä   ê  Ä   ë  Ä)   í  Ä*   í  Ä6   ÓÔ˛Ä8   í  Ä@   ì  ÄÅ   í  Äå   ÓÔ˛Äõ   î  Äú   î  Ä“   ÓÔ˛Ä‘   î  Ä›   ï  Ä   î  Ä˚   ÓÔ˛Ä  ñ  Ä  ó  Ä  ò  Ä	 
+    É   % 6      !  å " $       # T        F   "      '  " 	 
+ Ú   <   L              0       ù  Ä   ù  Ä	   ù  Ä   ' ( ) Ú   0   W    \          $       T  Ä*   U  Ä	 á 	 Å Ú   $   ≥                     ö  Ä	 Y Ù             `   h  å  §  »  ‡       8  P  h  Ä  †  ∏  –  Ë       D  \  x  ê  §  º  ‘                                                                                                                                      ˇˇˇˇ	/ÒÄ  ¿  —      …     E     e           !          y     ù           ·     —     i     •     ë     }     ©     ç     	     -      ë     °     Ÿ     ¡     Q     Å     5     9     •     e     i     ’     ]     5           Ω     Ò     π          È          M     Q     µ      È      E      }      	                                 	                          Ä                                                                                                                                                                                                                     @                                Ä                                                            @                  Ä                                                                                                            $   0   <   H   T   `   l   x   Ñ   ê   ú   ®   ¿   Ã   ÿ   ‰      ¸          ,  8  D  P  \  h  t  Ä  å  ò  §  ∞  º  »  ‘  ‡  Ï  ¯        (  4                                                                                                                                                                                                                                                                                                                                                                                                                                                  * %        <GetExceptionContext>b__12_0   )        0600001a   %    Ä    <.ctor>b__16_0     )    Ä    0600001b   %    Ï    <.ctor>b__16_1     )    Ï    0600001c   %        get_Activity   )        06000002   %    @    set_Activity   )    @    06000003   %    |    get_State  )    |    06000004   %    ¥    set_State  )    ¥    06000005   %    Ï    .ctor  )    Ï    06000006   %    Ï   ToString   )    Ï   06000007   %    `   Dispose    )    `   06                         ˇˇˇˇ	/Ò                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            000008   %    ‘   Clone  )    ‘   06000009   %        <PopOut>b__0   )        06000017  " %        get_ErrorContextStack  )        0600000a  " %    Ñ    set_ErrorContextStack  )    Ñ    0600000b   %    ¯    get_ActivityStack  )    ¯    0600000c   %    t   set_ActivityStack  )    t   0600000d   %    ‰   PushIn     )    ‰   0600000e   %    H   MoveToErrorStack   )    H   0600000f   %    ƒ   PopOut     )    ƒ   06000010   %    à   ExceptionBuilder   )    à   06000011  " %    ¨   GetExceptionContext    )    ¨   06000012   %       get_Instance   )       06000013   %    ê   .ctor  )    ê   06000014   %       .cctor     )       06000015                                                                                                                                                                                                                                                                                         W  \                     ≥                       æ  
+                     »                       œ                       ’                           ˇˇˇˇ    €        ˇˇˇˇ    ˇˇˇˇ                           C:\Develop\Vision\ContextStack\UsingStack.cs    ˛Ô˛Ô                  ˇˇˇˇˇˇˇˇˇˇ	 ˇˇˇˇˇˇˇˇˇˇStack.ExecutionContextStack.<>c__DisplayClass10_0 46164270       ˇˇ      ˇˇˇˇ    ˇˇ            
+ X      î    ÄÒ            ContextStack.ExecutionContextStack.<>c 7B2F9789 -∫.Ò                                                                                                           %                      C   !                      d   :                      û                         ™                        ª                                                 €                        Í                        ˘   ;                     4  Z                     é  ¢                    0                      L                    ˇˇˇˇw	1     é á[   ƒ  §  ,   T                   Ó¿        ˇˇ      ˇˇˇˇ    ˇˇ             D         ÄÒ            ContextStack.MIACContext 67FA9126       ˇˇ      ˇˇˇˇ    ˇˇ             h      ∞   ÄÒ            ContextStack.ExecutionContextStack 8D8F7EA7     ˇˇ      ˇˇˇˇ    ˇˇ             p       <    ÄÒ            ContextStack.ExecutionContextStack.<>c__DisplayClass10_0 46164270       ˇˇ      ˇˇˇˇ    ˇˇ            
+ X      î    ÄÒ            ContextStack.ExecutionContextStack.<>c 7B2F9î.1cö˙V   U#	µù?JíˇLxVÍ)·Z   /LinkInfo /names /src/headerblock /src/files/c:\develop\vision\contextstack\usingstack.cs                       "      
+                 ‹Q3                                                                                                                                                                                                                                                                                                                                                 ∂   8   W  8       Ä   Ä   \   (     †  ∏   |  P  ,   Ï     #      "   !          
+         	                                                                                                                                                                                                                                                                                                                                                                                           $                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+blob
+mark :10
+data 7680
+MZê       ˇˇ  ∏       @                                   Ä   ∫ ¥	Õ!∏LÕ!This program cannot be run in DOS mode.
+$       PE  L C—ÚV        ‡ " 0           &5       @                           Ä          `Ö                           ‘4  O    @  ò                   `     ú3                                                               H           .text   ,                           `.rsrc   ò   @                    @  @.reloc      `                    @  B                5      H     ƒ$  ÿ                                                         {  *"}  *{  *"}  *{  *"}  *û(  
+(  (  (  (  o  * 0 N     r  p
+ç  %¢%(  (  
+¢%r  p¢%(  ¢%r  p¢%(  o  ¢(  
+*2(  
+t  * 0 @       (  
+~  
+(  
+-
+(  
+˛+,(  o  -
+(  o  (  o  &*F{  o  
+o  
+*F{  o  
+o  
+*0 K     {  o  
+o  
+
++ (  
+{  o  
+o
+  o  
+ (  
+-Ÿﬁ ˛  o  
+‹*     +<     f{  o  
+s  o  
+*J{  o  
+o  
+*ñ{  o  
+o  
+,{  o  
+o   
+**~{  o  
+o  
+,(  o  *ñ{  o  
+o  
+,{  o  
+o!  
+**   0      {  o  
+o!  
+%
+o  *  0 n    r  po"  
+(#  
+
+{  o  
+o!  
+o  o  r  p	($  
+
++}{  o  
+o   
+ç  %¢%rM  p¢%å  ¢%rÉ  p¢%o  ¢(%  
+
+o  o  	o&  
+-#r£  po  o  ($  
+
+o  o  X{  o  
+o  
+,{  o  
+o!  
+:\ˇˇˇ{  o  
+o  
+,y{  o  
+o   
+ç  %¢%rM  p¢%å  ¢%rÉ  p¢%o  ¢(%  
+
+o  o  	o&  
+-#r£  po  o  ($  
+
+o  o  *~  *   0 [       ~  %-&~  ˛  s'  
+%Ä  s(  
+}  ~	  %-&~  ˛  s'  
+%Ä	  s(  
+}  (  
+*.s  Ä  *.s  Ä  *(  
+*s)  
+*  BSJB         v4.0.30319     l   º  #~  (  d  #Strings    å  ¿   #US L     #GUID   \  |  #Blob         W¢		   ˙3            	            )                                   ø      áy Ùy üG ô   «Á NÁ /Á €Á ßÁ ¿Á ﬁÁ ≥Z ëZ Á ky ˘M Ÿ— — vy B "
+ : Ç W (   ˘— 3 — i— ﬂ— ∑Z @— P —    h       °   >ò      uòE     ÉòE   ! ~   E    ¥ »  Œ À  ù Œ  8“  é“  •ﬁ 6 d ‚   Ê   Ê       ∆Y  P     Ü3z  X     Ü@  a     ÜH  i     ÜU  r     ÜbÚ  z     Ül˜  É     Ü3˝  ¨     ∆ g  !    Ü $ !    ÊJ  `!    Ü  U  r!    Ü ˆU  Ñ!    Ü   Ï!    Ü ÿ˝  "    Ü ÿ
+
+ "    Ü 	 ?"    Ü R  _"    Ü  à"    Ü  ∞"    Ü  *$    ñË  4$    Ü3  õ$    ë9  ß$    ë9  ≥$    Ü3  ª$    É  $ ª$    É $ $             q  “ À   q  “ À      ’   ’    I 	 3  3  3
+ ) 3 1 3 9 3 A 3 I 3 Q 3 Y 3 a 3 i 3 q 3 y 3 Å 3 ô 3 â 3 — g … ƒ# â .) Ÿ Ø- · 1 · *4 Ÿ ı :  I  ÏU  %d  ‡I  pt  z ë J  I  ≤I π  … ƒä … ƒê … ƒó … ®ù $ 3≠  3≥  3       ∆  !    % ∆ ! É v.  ?.  H.  g. # p. + É. 3 É. ; É. C p. K â. S É. [ É. c °. k À. s ÿ. s . s . { (@ É vA É v` É va É vÄ É v† É v£ É v¿ É v‡ É v Y ~ Ç       D-  Y1  p5  Ï :                    	 > N m ¢ Ä               V              Ω u                Ω —         <>9__15_0 <.ctor>b__15_0 <>9__15_1 <.ctor>b__15_1 Func`1 Stack`1 ThreadLocal`1 Int32 ClassLibrary2 <>9 <Module> sta mscorlib <>c System.Collections.Generic <state>k__BackingField <catching>k__BackingField <activity>k__BackingField get_Instance GetExceptionCode get_Message IDisposable frame MakeClone MemberwiseClone IStateAware Dispose Update GetState get_state set_state CompilerGeneratedAttribute GuidAttribute DebuggableAttribute ComVisibleAttribute AssemblyTitleAttribute AssemblyTrademarkAttribute TargetFrameworkAttribute AssemblyFileVersionAttribute AssemblyConfigurationAttribute AssemblyDescriptionAttribute InternalsVisibleToAttribute CompilationRelaxationsAttribute AssemblyProductAttribute AssemblyCopyrightAttribute AssemblyCompanyAttribute RuntimeCompatibilityAttribute get_Value value System.Threading get_catching set_catching System.Runtime.Versioning ToString Push UsingStackObj UsingStack TempStack ContextStack contextStack Peek Marshal ClassLibrary2.dll System PushIn Boolean System.Reflection Exception Zero Pop PeekTop ExceptionBuilder GetEnumerator .ctor .cctor IntPtr System.Diagnostics System.Runtime.InteropServices System.Runtime.CompilerServices DebuggingModes Equals GetExceptionPointers Concat optcat optact Object get_Current get_Count TempCount GetCount PopOut MoveNext ex ExceptionCopy op_Inequality CurrentActivity get_activity set_activity     
+  E 
+ S t a t e   w h e n   E x c e p t i o n   O c c u r r e d   :    5 
+ 	   S t e p s   F r o m   E x c e p t i o n :     
+ 	 	   A c t i v i t y :     
+ 	 	   S t a t e :       ){«XûÂΩDÉ+€
+çøHa                 
+QU   U  
+Y  Y Y        
+aU 	 a ∑z\V4‡â QUaU         ]      U( ( (          TWrapNonExceptionThrows       ClassLibrary2       Copyright ¬©  2016  ) $c7621eed-73a1-4c24-9259-b9af6a8062c0   1.0.0.0   ContextStack.Tests   ClassLibrary2.Explorables   ContextStack.Tests1  M .NETFramework,Version=v4.5.2 TFrameworkDisplayName.NET Framework 4.5.2        C—ÚV         ∏3  ∏  RSDS±mÜH‚p≥Cé˛k^¯	L/   C:\Develop\Vision\ContextStack\obj\Release\ClassLibrary2.pdb                                                                                                                                                                                                        ¸4          5                          5            _CorDllMain mscoree.dll     ˇ%                                                                                                                                                                                                                                           Ä                  0  Ä                   H   X@  <          <4   V S _ V E R S I O N _ I N F O     ΩÔ˛                 ?                         D    V a r F i l e I n f o     $    T r a n s l a t i o n       ∞ú   S t r i n g F i l e I n f o   x   0 0 0 0 0 4 b 0      C o m m e n t s       "   C o m p a n y N a m e         D   F i l e D e s c r i p t i o n     C l a s s L i b r a r y 2   0   F i l e V e r s i o n     1 . 0 . 0 . 0   D   I n t e r n a l N a m e   C l a s s L i b r a r y 2 . d l l   H   L e g a l C o p y r i g h t   C o p y r i g h t   ©     2 0 1 6   *   L e g a l T r a d e m a r k s         L   O r i g i n a l F i l e n a m e   C l a s s L i b r a r y 2 . d l l   <   P r o d u c t N a m e     C l a s s L i b r a r y 2   4   P r o d u c t V e r s i o n   1 . 0 . 0 . 0   8   A s s e m b l y   V e r s i o n   1 . 0 . 0 . 0                                                                                                                0     (5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+blob
+mark :11
+data 19968
+Microsoft C/C++ MSF 7.00
+DS         '   ∏       #                                                                                                                                                                                                                                                                                                                                                                                                                                                                           ¿ˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇ8   ˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇ 18              ˇˇ   ˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  18              ˇˇ   ˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 î.1C—ÚV   ±mÜH‚p≥Cé˛k^¯	L/                          ‹Q3                                                                                                                                                                                                                                                                                                                                                                                                                                                                     18             ˇˇˇˇ   ˇˇ     ˇˇˇˇ    ˇˇˇˇ    ˇˇˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                         18             ˇˇˇˇ   ˇˇ     ˇˇˇˇ    ˇˇˇˇ    ˇˇˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ¯bQ?∆”êS ¿O£°ƒEKôÈÊ“ê? ¿O£°ùÜZf”Ω*  ¯IΩÏˇ^™Má˜oIcÉ4`       FFi7>Ó∆-…–Ts°ÖÃÉ                                                                                                                                                                                                                                                                                                                                                                                                                                            Ô      Ô                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ˛Ô˛Ô   \    C:\Develop\Vision\ContextStack\UsingStack.cs  c:\develop\vision\contextstack\usingstack.cs    .   /                                                                                                                                                                                                                                                                                                                                                                                                             ‚0Ä   Í≤*’(Ö—                                                               /   (   ‚0| òJ\      .   /   e                                                                                                                                                                                                                                                                                                                                                                                                              6 *    l                    „      <.ctor>b__15_0 . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    ÿ                    È      <.ctor>b__15_1 . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $   „                     @  Äq ã Ú   $   È                     A  Äk Ö Ù                        8   X                                                                                                                                                                              6 *    <                            get_catching     6 *    x                           set_catching     6 *    ¥                           get_activity     6 *                               set_activity     2 *    (                          get_state    2 *    `                   %       set_state    . *    L      '             -       .ctor   d    '   -      
+ $USystem  $USystem.Collections.Generic " $USystem.Runtime.InteropServices  $USystem.Threading     2 …?Í∆≥Y÷Iº%	ª´¥`    M D 2                   2 *    Ë      N           	  T       ToString    P  ¥  N   T                      ret   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *    P                 
+  ¢       MakeClone  . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *    ∏      @             Æ       Dispose    . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $                          
+  Ä  $ Ú   $                         
+  Ä% ) Ú   $                           Ä" & Ú   $                           Ä' + Ú   $                           Ä$ ( Ú   $   %                        Ä) - Ú   `   -     '          T         Ä     Ä     Ä     Ä     Ä&     Ä	 W        . 	 
+ Ú   0   T     N          $         Ä     Ç !  , Ú   $   ¢                        Ä : Ú   T   Æ     @          H       #  Ä   $  Ä*   &  Ä4   (  Ä?   )  Ä s  I  5  * 	 
+ Ù             P   p   å   §   ¿   ÿ   Ù     (  @  X  p  à  †  ¥  Ã  ‰  ¸    ,  D                                                                                                                                                                                                                                                                                                                                                                                                                                                     2 *    h                    Ó       GetCount   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *    –                    ˇ       TempCount  . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    ê      K                   ExceptionCopy   ‘   \  K           X     #                    frame       . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    Ù                   [      PushIn . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    X                   t      PushIn . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    º      %             Ü      PopOut . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *                        ´      Update . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *    à      %                    PeekTop    . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *                       Ô      PeekTop    . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              : *    Ù      n            	      ExceptionBuilder    Ù  ¿  n  	                     value                  temp                   unwind  "               stateAtError      . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    `                   w      get_Instance   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    ‘      [             }      .ctor  > …?Í∆≥Y÷Iº%	ª´¥`    M D 2                d  I   . *    8                   ÿ      .cctor . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $   Ó                      C  Ä! D Ú   $   ˇ                      D  Ä" ? Ú   l       K          `       G  Ä   ÓÔ˛Ä   G  Ä   I  Ä1   G  Ä<   ÓÔ˛ÄJ   K  Ä# 8        9   "     	 
+ Ú   0   [              $       O  Ä   P  Ä P 	 
+ Ú   0   t              $       S  Ä   T  Ä / 	 
+ Ú   <   Ü    %          0       W  Ä   X  Ä#   Z  Ä 2  4   Ú   <   ´              0       f  Ä   g  Ä   i  Ä 2  * 	 
+ Ú   <        %          0       l  Ä   m  Ä#   o  Ä 2  5   Ú   $   Ô                     s  Ä @ Ú   ¸   	    n                }  Ä     Ä   Ä  Ä.   Å  Ä;   ÓÔ˛Ä=   Ñ  ÄN   Ö  ÅÄ   á  Äì   â  Ä™   ä  Ä∂   å  Ä∫   Ç  Ä·   é  ÄÛ   ê  Ä  ë  Å6  ì  ÄI  ï  Ä`  ñ  Äl  ö  Ä 0    K  L      .  @  A  N  :    U  ,  .  @  A  N  :   Ú   $   w                     †  Ä ' Ú   0   }    [          $       @  Ä*   A  Ä	 ç 	 á Ú   $   ÿ                     ù  Ä	 C Ù             h   \  t  å  §  º  ÿ         8  P  h  Ä  ò  ∞  »  ‡  ¯    0  H  d  |  ê  ®  ¿                                                                                                                                                                                                                                                                                                                                                                                                  ˇˇˇˇ	/Òê  ¿  ç      E     ô     !      ]     ¡      u     …     Y      9     }     °     Õ     ˝          i     ç     Y     	     e     -     â     ë     ı      •     ˘     )     Ÿ     1     I     Å     ©     Ω     µ     ¡     Q     Â     q      •           9      A     q     !     Ò           ·     ±     Ÿ                                                                                        Ä                                                                                                                                                                               Ä                                              Ä                                                          @                  Ä                                                                                                            $   0   <   H   T   `   l   x   ê   ú   ®   ¥   ¿   Ã   ÿ   ‰      ¸          ,  8  D  P  \  h  t  Ä  å  ò  §  ∞  º  »  ‘  ‡  Ï  ¯      (  @  L                                                                                                                                                                                                                                                                                                                                                                                                                                   %        <.ctor>b__15_0     )        0600001b   %    p    <.ctor>b__15_1     )    p    0600001c   %        get_catching   )        06000002   %    @    set_catching   )    @    06000003   %    |    get_activity   )    |    06000004   %    ∏    set_activity   )    ∏    06000005   %    Ù    get_state  )    Ù    06000006   %    ,   set_state  )    ,   06000007   %    d   .ctor  )    d   06000008   %    P   ToString   )    P   06000009   %                       aåUˇˇˇˇ	/Ò                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                Ï   MakeClone  )    Ï   0600000a   %    T   Dispose    )    T   0600000b   %        GetCount   )        0600000c   %    l    TempCount  )    l    0600000d   %    ‘    ExceptionCopy  )    ‘    0600000e   %    î   PushIn     )    î   0600000f   %    ¯   PushIn     )    ¯   06000010   %    \   PopOut     )    \   06000011   %    ¿   Update     )    ¿   06000012   %    $   PeekTop    )    $   06000013   %    å   PeekTop    )    å   06000014   %    Ù   ExceptionBuilder   )    Ù   06000015   %    ¯   get_Instance   )    ¯   06000016   %    d   .ctor  )    d   06000017   %    ÿ   .cctor     )    ÿ   06000018                                                                                                                                                                                                                                                                                                            %                       -   '                    T   N                    ¢                       Æ   @                    Ó                      ˇ                        K                   [                     t                     Ü  %                   ´                        %                   Ô                     	  n                  w                     }  [                   ÿ                     „  ˇˇˇˇw	1     é á[   0  ¿  ,   L                   Ó¿        ˇˇ      ˇˇˇˇ    ˇˇ             º      @   7Ë            ContextStack.UsingStackObj 13CCB2FC     ˇˇ      ˇˇˇˇ    ˇˇ             <      ÿ   7Ë            ContextStack.UsingStack 4878A330        ˇˇ      ˇˇˇˇ    ˇˇ            
+ ‹       h    7Ë            ContextStack.UsingStack.<>c BD1C06EE    -∫.Ò                                                                                                                                       È                          ˇˇˇˇ    Ô        ˇˇˇˇ    ˇˇˇˇ                     C:\Develop\Vision\ContextStack\UsingStack.cs    ˛Ô˛Ô                  ˇˇˇˇˇˇˇˇˇˇ	 ˇˇˇˇˇˇˇˇˇˇ                                                                                                                                                                                                                                                                                                         î.1C—ÚV   ±mÜH‚p≥Cé˛k^¯	L/Z   /LinkInfo /names /src/headerblock /src/files/c:\develop\vision\contextstack\usingstack.cs                       "      
+                 ‹Q3                                                                                                                                                                                                                                                                                                                                                 ∂   8   ◊  8       Ä   Ä   \   (   X  P  Ä
+  `  ,   ÿ     !                   
+         	                                                                                                                                                                                                                                                                                                                                                                                                 "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+blob
+mark :12
+data 8704
+MZê       ˇˇ  ∏       @                                   Ä   ∫ ¥	Õ!∏LÕ!This program cannot be run in DOS mode.
+$       PE  L cö˙V        ‡ " 0           Z9       @                           Ä          `Ö                           9  O    @  ò                   `     –7                                                               H           .text   `                           `.rsrc   ò   @                    @  @.reloc      `                     @  B                <9      H     ¯%  ÿ                                                         {  *"}  *{  *"}  *ñ(  
+  (   (   (  o   *0 !      r  p(  (  o  (  
+
++ *   0 :      (  
+~  
+(  
+-
+(  
+˛+
+,(  o   (  o   *  0       (  
+
++ *0       {  o  
+
++ *> {  o  
+ *   0       {  o  
+
++ *> {  o  
+ *> (  o  
+ *   0 ;      (  o  
+,(  o  
+˛+
+,(
+  o	  u  o  
+ * 0 Z     s  
+}   (  o  
+,(  ˛  s  
+(  +˛+,+ (  o  
+{  ˛˛-Â*  0 ¢     r  po   
+(!  
+
+{  o  
+o  
+o  o  r  p	("  
+
+8à    {  o  
+o  
+ç  %¢%rc  p¢%å"  ¢%rô  p¢%o  ¢(#  
+
+o  o  	o$  
+˛,% rπ  po  o  ("  
+
+o  o   X {  o  
+o  
+,{  o  
+o  
+˛+:Gˇˇˇ{  o  
+o  
+˛9Ñ    {  o  
+o  
+ç  %¢%rc  p¢%å"  ¢%rô  p¢%o  ¢(#  
+
+o  o  	o$  
+˛,% rπ  po  o  ("  
+
+o  o    + *  0      
+r”  po   
+r◊  p(
+  o  
+o%  
+(&  
+ (
+  o'  
++I((  
+ç  %¢%r p¢%%X
+å"  ¢% s)  
+¢%rO p¢%	o  ¢(#  
+(*  
+-Æﬁ˛  o+  
+ ‹ (
+  ~  %-&~  ˛  s,  
+%Ä  (  +(  +o/  
++o0  
+rk po  ("  
+o1  
+-€ﬁ,o+  
+ ‹(
+  o2  
+ + *   6 Vå      “ )˚     0       ~  
++ * 0 \       ~	  %-&~  ˛  s3  
+%Ä	  s4  
+}  ~
+  %-&~  ˛  s3  
+%Ä
+  s4  
+}  (  
+ *.s  Ä  *"(  
+ **{  ˛*.s  Ä  *o  *s5  
+* BSJB         v4.0.30319     l   h  #~  ‘  h  #Strings    <  Ñ  #US ¿     #GUID   –    #Blob         W¢		
+   ˙3      #      
+            5                  	                    |      D pD  d   _ú Êú «ú Wú #ú <ú vú K% % ™ú ëπ ∞é wé aé ÛD Õ 0 ö ®
+ í Î  Æé_ Û   ® Î  º é } é ’é t% é l¡ Ñ Î  ∂ é ‰z    ’       °   ô1      ¸1A     ¸1A  
+     A   ! Á   A    } Ä OÑ ·Ñ >ê Éî6 — ò  ú > ¶ d ¶      ∆‰≠  P     Ü5≠  X     ÜB  a     Üπ≤ i     Å√∑ r     Ü˛Ω ò     ∆ ”≠  »     Ê±  !    ÊìD  (!    Åƒ E!    Å(Õ X!    ÅKƒ u!    Å]Õ Ö!    É ï◊ ò!    É Î◊ ‡!    É Ï◊	 H"    Ü ”›
+ ¯#    Ü › <%    ñ7„ T%    Ü˛  º%    ëË »%    Ü˛  —%    É W Ï ‹%    ëË »%    Ü˛  Ë%    É ! Ú %    É H ƒ %    É n ƒ    ¢   ¢   Ì _   ¢   ¢   É   É   É   $   $       E  I 	 ˛  ˛  ˛
+ ) ˛ 1 ˛ 9 ˛ A ˛ I ˛ Q ˛ Y ˛ a ˛ i ˛ q ˛ y ˛ ô ˛ © ˛ Å ˛ È ©$ Ò ç/ ˘ ∏3 ˘ '6 Ò D< Å âD  é\  òa  ‹a  ‚n  o\  ˛Å «á  Ω\ ¡ U≠ È ¢± È ¢∑ È ¢æ È sƒ Å ”≠ È ¢ﬂ  Á $ ÷\ È ˛˜ $ Û˝ â ± , ˛Å ∑
+æ+4 J< ÷\ Û˝  Õ D ˛Å  ˛j ˛     ! { ˜! É ¸.  .  .  8. # A. + T. 3 T. ; T. C A. K Z. S T. [ T. c r. k ú. s ©@ { ˜A { ˜A É ¸` { ˜Ä { ˜† { ˜£ { ˜√ { ˜  + @ H r † … Z      V˘  Á˝  ,  a  ;             
+       	   	    Q g y  BS_Ä               √              tﬁ                té               t•        = õ [ $] =     <>c__DisplayClass10_0 <>9__12_0 <GetExceptionContext>b__12_0 <>9__16_0 <.ctor>b__16_0 <PopOut>b__0 <>9__16_1 <.ctor>b__16_1 Func`1 IEnumerable`1 Stack`1 ThreadLocal`1 IEnumerator`1 Int32 Func`2 ClassLibrary2 <>9 <Module> mscorlib <>c System.Collections.Generic <State>k__BackingField <Activity>k__BackingField get_Instance GetExceptionCode get_Message ICloneable Enumerable IDisposable frame MemberwiseClone IStateAware System.Core Dispose get_State set_State DebuggerBrowsableState GetState state CompilerGeneratedAttribute GuidAttribute DebuggableAttribute DebuggerBrowsableAttribute ComVisibleAttribute AssemblyTitleAttribute AssemblyTrademarkAttribute TargetFrameworkAttribute AssemblyFileVersionAttribute AssemblyConfigurationAttribute AssemblyDescriptionAttribute CompilationRelaxationsAttribute AssemblyProductAttribute AssemblyCopyrightAttribute AssemblyCompanyAttribute RuntimeCompatibilityAttribute get_Value set_Value value System.Threading System.Runtime.Versioning ToString Push tempStack MoveToErrorStack ExecutionContextStack get_ErrorContextStack set_ErrorContextStack contextStack get_ActivityStack set_ActivityStack Peek Marshal ClassLibrary2.dll System PushIn System.Reflection Exception Zero Pop System.Linq Clear ExceptionBuilder IEnumerator GetEnumerator .ctor .cctor IntPtr System.Diagnostics System.Runtime.InteropServices System.Runtime.CompilerServices DebuggingModes Equals System.Collections GetExceptionPointers Concat Format Object Select Distinct FirstOrDefault get_Current get_Count PopOut MoveNext MIACContext GetExceptionContext context ex op_Inequality get_Activity set_Activity currentActivity activity   
+ { 0 }  
+ { 1 }   
+  E 
+ S t a t e   w h e n   E x c e p t i o n   O c c u r r e d   :    5 
+ 	   S t e p s   F r o m   E x c e p t i o n :     
+ 	 	   A c t i v i t y :     
+ 	 	   S t a t e :    
+  C
+ S t a t e   w h e n   E x c e p t i o n   O c c u r r e d   :    3
+ 	   S t e p s   F r o m   E x c e p t i o n :    	 	   A c t i v i t y :    
+ 	 	   S t a t e :     ù^íá◊ÍàJΩÄu
+.÷S        Q        ]
+Y]     ]  m  ÄÖ m 
+	      ei   e e   mÄÖÄÖ m 
+ÄÖ ÄÖ 
+ÄÖ  i i
+q]	 q ∑z\V4‡âY]	mq]      ]	 ]  a      ( ( ( ]         TWrapNonExceptionThrows      ClassLibrary2       Copyright ¬©  2016  ) $c7621eed-73a1-4c24-9259-b9af6a8062c0   1.0.0.0  M .NETFramework,Version=v4.5.2 TFrameworkDisplayName.NET Framework 4.5.2                 cö˙V         Ï7  Ï  RSDSU#	µù?JíˇLxVÍ)·   C:\Develop\Vision\ContextStack\obj\Debug\ClassLibrary2.pdb                                                                                                                                                                                                          09          J9                          <9            _CorDllMain mscoree.dll     ˇ%                                                                                                                                                                                       Ä                  0  Ä                   H   X@  <          <4   V S _ V E R S I O N _ I N F O     ΩÔ˛                 ?                         D    V a r F i l e I n f o     $    T r a n s l a t i o n       ∞ú   S t r i n g F i l e I n f o   x   0 0 0 0 0 4 b 0      C o m m e n t s       "   C o m p a n y N a m e         D   F i l e D e s c r i p t i o n     C l a s s L i b r a r y 2   0   F i l e V e r s i o n     1 . 0 . 0 . 0   D   I n t e r n a l N a m e   C l a s s L i b r a r y 2 . d l l   H   L e g a l C o p y r i g h t   C o p y r i g h t   ©     2 0 1 6   *   L e g a l T r a d e m a r k s         L   O r i g i n a l F i l e n a m e   C l a s s L i b r a r y 2 . d l l   <   P r o d u c t N a m e     C l a s s L i b r a r y 2   4   P r o d u c t V e r s i o n   1 . 0 . 0 . 0   8   A s s e m b l y   V e r s i o n   1 . 0 . 0 . 0                                                                                                                0     \9                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+blob
+mark :13
+data 19968
+Microsoft C/C++ MSF 7.00
+DS         '   ƒ       %                                                                                                                                                                                                                                                                                                                                                                                                                                                                           ¿ˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇ8   ¿ˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇ 18              ˇˇ   ˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  18              ˇˇ   ˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 î.1cö˙V   U#	µù?JíˇLxVÍ)·                          ‹Q3                                                                                                                                                                                                                                                                                                                                                                                                                                                                     18             ˇˇˇˇ   ˇˇ     ˇˇˇˇ    ˇˇˇˇ    ˇˇˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                         18             ˇˇˇˇ   ˇˇ     ˇˇˇˇ    ˇˇˇˇ    ˇˇˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ¯bQ?∆”êS ¿O£°ƒEKôÈÊ“ê? ¿O£°ùÜZf”Ω*  ¯IΩÏˇ^™Má˜oIcÉ4`       Ecæÿ∞oöKDX1õéIŸü∫                                                                                                                                                                                                                                                                                                                                                                                                                                            €      €                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ˛Ô˛Ô   \    C:\Develop\Vision\ContextStack\UsingStack.cs  c:\develop\vision\contextstack\usingstack.cs    .   /                                                                                                                                                                                                                                                                                                                                                                                                             ‚0Ä   ∞J?‘Ãâ—                                                               /   (   ‚0Fíæk\      .   /   e                                                                                                                                                                                                                                                                                                                                                                                                              F *    |                    »      <GetExceptionContext>b__12_0   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    Ë                    œ      <.ctor>b__16_0 . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    T                   ’      <.ctor>b__16_1 . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $   »                     î  ÄA H Ú   $   œ                     T  Äm Ö Ú   $   ’                     U  Äg  Ù                    ,   D   d   |   ú                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              6 *    <                            get_Activity     6 *    x                           set_Activity     2 *    ∞                           get_State    2 *    Ë                           set_State    . *    Ë      %                    .ctor   Ï   ∞  %         
+ $USystem  $USystem.Linq     $USystem.Collections.Generic " $USystem.Runtime.InteropServices  $USystem.Threading     2 …?Í∆≥Y÷Iº%	ª´¥`    M D 2                   2 *    \      !             C       ToString   : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    2 *    –      :             d       Dispose    : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    . *    @                 	  û       Clone  : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    Ú   $                            Ä" & Ú   $                           Ä' + Ú   $                           Ä$ ( Ú   $                           Ä) 5 Ú   `        %          T         Ä     Ä     Ä     Ä     Ä$     Ä	 D 	 
+    !  9 	 
+ Ú   <   C     !          0         Ä     Ä     Ä	 
+  P 	 
+ Ú   `   d     :          T         Ä     Ä   ÓÔ˛Ä!     Ä-     Ä9     Ä	 
+  b      G  9 	 
+ Ú   <   û               0       "  Ä   #  Ä
+   $  Ä	 
+  & 	 
+ Ù             @   ¥   –   Ë       4  L  d  |  ê  ®  ¿  ÿ                                                                                                           6 *    l       
+             æ      <PopOut>b__0   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $   æ    
+                 d  ÄU e Ù                4  P                                                                                                                                                                                                                                                                                                                                             > *    Ä                  
+  ™       get_ErrorContextStack  : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    > *    Ù                    ª       set_ErrorContextStack  . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              : *    p                           get_ActivityStack  : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    : *    ‡                   €       set_ActivityStack  . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    D                   Í       PushIn . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              : *    ¿      ;             ˘       MoveToErrorStack   : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    . *    Ñ      Z             4      PopOut  ƒ  0  Z   4     "                CS$<>8__locals0   N …?Í∆≥Y÷Iº%	ª´¥`    M D 2                ÄÑ     X    : *    ®      ¢            é      ExceptionBuilder    à  T  ¢  é                     value                  temp                   unwind  "               stateAtError      N …?Í∆≥Y÷Iº%	ª´¥`    M D 2                 MdÄÑÇ4ÅÉLÑA   > *                      0      GetExceptionContext     ¨  ¥    0                     unwind  "               contextString    Ï  x  I   h                    context    Ï  ∞                         state       Z …?Í∆≥Y÷Iº%	ª´¥`    M D 2                4Ä±Ä±ÅvÅv       Å™    6 *    å                   L      get_Instance   : …?Í∆≥Y÷Iº%	ª´¥`    M D 2                    . *           \             W      .ctor  > …?Í∆≥Y÷Iº%	ª´¥`    M D 2                ^  E   . *    d                   ≥      .cctor . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   <   ™               0       ?  Ä   @  Ä   B  Ä   (   Ú   <   ª               0       D  Ä   E  Ä   F  Ä   )   Ú   <                   0       K  Ä   L  Ä   N  Ä   .   Ú   <   €               0       P  Ä   Q  Ä   R  Ä   /   Ú   <   Í               0       X  Ä   Y  Ä   Z  Ä	 
+  ' 	 
+ Ú   T   ˘     ;          H       ]  Ä   ^  Ä    ÓÔ˛Ä#   _  Ä:   `  Ä	 
+  K      F 	 
+ Ú   Ñ   4    Z       	   x       ÓÔ˛Ä   c  Ä   d  Ä9   ÓÔ˛Ä<   ÓÔ˛Ä>   e  Ä?   e  ÄV   ÓÔ˛ÄY   f  Ä    	 
+  o         6 7  5     	 
+ Ú   §  é    ¢      !   ò      n  Ä   o  Ä   q  Ä   r  Ä/   s  Ä<   ÓÔ˛ÄA   u  ÄB   v  ÄS   w  ÅÖ   y  Äõ   ÓÔ˛Äü   z  Ä†   {  Ä∑   |  Ä√   }  Äƒ   ~  Ä»     Ä…   t  ÄÛ   ÓÔ˛Ä˙   Ä  Ä  ÓÔ˛Ä  Å  Ä  Ç  Ä(  É  ÅZ  Ö  Äp  ÓÔ˛Ät  Ü  Äu  á  Äå  à  Äò  â  Äô  ä  Äö  ã  Äü  å  Ä	 
+  0    K  L        .  @  A        N  :        U      ,        .  @  A        N  :       	 
+ Ú     0             ¸       è  Ä   ê  Ä   ë  Ä)   í  Ä*   í  Ä6   ÓÔ˛Ä8   í  Ä@   ì  ÄÅ   í  Äå   ÓÔ˛Äõ   î  Äú   î  Ä“   ÓÔ˛Ä‘   î  Ä›   ï  Ä   î  Ä˚   ÓÔ˛Ä  ñ  Ä  ó  Ä  ò  Ä	 
+    É   % 6      !  å " $       # T        F   "      '  " 	 
+ Ú   <   L              0       ù  Ä   ù  Ä	   ù  Ä   ' ( ) Ú   0   W    \          $       T  Ä*   U  Ä	 á 	 Å Ú   $   ≥                     ö  Ä	 Y Ù             `   h  å  §  »  ‡       8  P  h  Ä  †  ∏  –  Ë       D  \  x  ê  §  º  ‘                                                                                                                                      ˇˇˇˇ	/ÒÄ  ¿  —      …     E     e           !          y     ù           ·     —     i     •     ë     }     ©     ç     	     -      ë     °     Ÿ     ¡     Q     Å     5     9     •     e     i     ’     ]     5           Ω     Ò     π          È          M     Q     µ      È      E      }      	                                 	                          Ä                                                                                                                                                                                                                     @                                Ä                                                            @                  Ä                                                                                                            $   0   <   H   T   `   l   x   Ñ   ê   ú   ®   ¿   Ã   ÿ   ‰      ¸          ,  8  D  P  \  h  t  Ä  å  ò  §  ∞  º  »  ‘  ‡  Ï  ¯        (  4                                                                                                                                                                                                                                                                                                                                                                                                                                                  * %        <GetExceptionContext>b__12_0   )        0600001a   %    Ä    <.ctor>b__16_0     )    Ä    0600001b   %    Ï    <.ctor>b__16_1     )    Ï    0600001c   %        get_Activity   )        06000002   %    @    set_Activity   )    @    06000003   %    |    get_State  )    |    06000004   %    ¥    set_State  )    ¥    06000005   %    Ï    .ctor  )    Ï    06000006   %    Ï   ToString   )    Ï   06000007   %    `   Dispose    )    `   06                         ˇˇˇˇ	/Ò                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            000008   %    ‘   Clone  )    ‘   06000009   %        <PopOut>b__0   )        06000017  " %        get_ErrorContextStack  )        0600000a  " %    Ñ    set_ErrorContextStack  )    Ñ    0600000b   %    ¯    get_ActivityStack  )    ¯    0600000c   %    t   set_ActivityStack  )    t   0600000d   %    ‰   PushIn     )    ‰   0600000e   %    H   MoveToErrorStack   )    H   0600000f   %    ƒ   PopOut     )    ƒ   06000010   %    à   ExceptionBuilder   )    à   06000011  " %    ¨   GetExceptionContext    )    ¨   06000012   %       get_Instance   )       06000013   %    ê   .ctor  )    ê   06000014   %       .cctor     )       06000015                                                                                                                                                                                                                                                                                         W  \                     ≥                       æ  
+                     »                       œ                       ’                           ˇˇˇˇ    €        ˇˇˇˇ    ˇˇˇˇ                           C:\Develop\Vision\ContextStack\UsingStack.cs    ˛Ô˛Ô                  ˇˇˇˇˇˇˇˇˇˇ	 ˇˇˇˇˇˇˇˇˇˇStack.ExecutionContextStack.<>c__DisplayClass10_0 46164270       ˇˇ      ˇˇˇˇ    ˇˇ            
+ X      î    ÄÒ            ContextStack.ExecutionContextStack.<>c 7B2F9789 -∫.Ò                                                                                                           %                      C   !                      d   :                      û                         ™                        ª                                                 €                        Í                        ˘   ;                     4  Z                     é  ¢                    0                      L                    ˇˇˇˇw	1     é á[   ƒ  §  ,   T                   Ó¿        ˇˇ      ˇˇˇˇ    ˇˇ             D         ÄÒ            ContextStack.MIACContext 67FA9126       ˇˇ      ˇˇˇˇ    ˇˇ             h      ∞   ÄÒ            ContextStack.ExecutionContextStack 8D8F7EA7     ˇˇ      ˇˇˇˇ    ˇˇ             p       <    ÄÒ            ContextStack.ExecutionContextStack.<>c__DisplayClass10_0 46164270       ˇˇ      ˇˇˇˇ    ˇˇ            
+ X      î    ÄÒ            ContextStack.ExecutionContextStack.<>c 7B2F9î.1cö˙V   U#	µù?JíˇLxVÍ)·Z   /LinkInfo /names /src/headerblock /src/files/c:\develop\vision\contextstack\usingstack.cs                       "      
+                 ‹Q3                                                                                                                                                                                                                                                                                                                                                 ∂   8   W  8       Ä   Ä   \   (     †  ∏   |  P  ,   Ï     #      "   !          
+         	                                                                                                                                                                                                                                                                                                                                                                                           $                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+blob
+mark :14
+data 327
+C:\Develop\Vision\ContextStack\bin\Debug\ClassLibrary2.dll
+C:\Develop\Vision\ContextStack\bin\Debug\ClassLibrary2.pdb
+C:\Develop\Vision\ContextStack\obj\Debug\ContextStack.csprojResolveAssemblyReference.cache
+C:\Develop\Vision\ContextStack\obj\Debug\ClassLibrary2.dll
+C:\Develop\Vision\ContextStack\obj\Debug\ClassLibrary2.pdb
+
+blob
+mark :15
+data 1922
+    ˇˇˇˇ          ^Microsoft.Build.Tasks.Core, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a   !Microsoft.Build.Tasks.SystemState   	fileStateSystem.Collections.Hashtable   	      System.Collections.Hashtable   
+LoadFactorVersionComparerHashCodeProviderHashSizeKeysValues   System.Collections.IComparer$System.Collections.IHashCodeProviderÏQ8?   
+
+   	   	      	      hC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Net.Http.dll   dC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Core.dll   hC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Xml.Linq.dll	   dC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Data.dll
+   aC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\mscorlib.dll   iC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\Microsoft.CSharp.dll   vC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Data.DataSetExtensions.dll   cC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Xml.dll   _C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.dll   	   	   	   	   	   	   	   	   	   	      +Microsoft.Build.Tasks.SystemState+FileState   lastModifiedassemblyNamedependenciesscatterFilesruntimeVersionframeworkName     Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+    
+v4.0.30319
+
+blob
+mark :16
+data 6672
+    ˇˇˇˇ          dMicrosoft.VisualStudio.CommonIDE, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a   8Microsoft.VisualStudio.Build.ComInteropWrapper.RarInputs   allowedAssemblyExtensionsappConfigFilecandidateAssemblyFilesfullFrameworkAssemblyTablesfullFrameworkFoldersfullTargetFrameworkSubsetNames$ignoreDefaultInstalledAssemblyTables*ignoreDefaultInstalledAssemblySubsetTablesinstalledAssemblyTablesinstalledAssemblySubsetTables latestTargetFrameworkDirectoriespdtarSearchPathsgdtarSearchPathsprofileNameregistrySearchPath	stateFiletargetFrameworkDirectoriestargetFrameworkMoniker!targetFrameworkMonikerDisplayNametargetFrameworkVersiontargetProcessorArchitecturetargetedRuntimeVersiontargetFrameworkSubsetsuseReferencesFromProjectreferencePaths   üSystem.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]üSystem.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]üSystem.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]   	   
+	   	   	   	     	   		   	
+   	   
+       D{Registry:Software\Microsoft\.NETFramework,v4.5.2,AssemblyFoldersEx}   RC:\Develop\Vision\ContextStack\obj\Debug\DesignTimeResolveAssemblyReferences.cache	      .NETFramework,Version=v4.5.2   .NET Framework 4.5.2   v4.5.2   msil   
+v4.0.30319	    
+         .winmd   .dll   .exe   	      iC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\Microsoft.CSharp.dll   aC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\mscorlib.dll   dC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Core.dll   vC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Data.DataSetExtensions.dll   dC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Data.dll   _C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.dll   hC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Net.Http.dll    cC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Xml.dll!   hC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Xml.Linq.dll   üSystem.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]   _items_size_version  ØSystem.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]][]	"                 #   UC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\      $   Full      	"           	      	"           
+             &   {CandidateAssemblyFiles}'   {HintPathFromItem}(   {TargetFrameworkDirectory})   D{Registry:Software\Microsoft\.NETFramework,v4.5.2,AssemblyFoldersEx}*   {RawFileName}+   )C:\Develop\Vision\ContextStack\bin\Debug\      ,   UC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\-   ]C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\Facades\       "           ≠System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.Collections.Generic.List`1[[System.Collections.Generic.KeyValuePair`2[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089],[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]
+blob
+mark :17
+data 0
+
+blob
+mark :18
+data 0
+
+blob
+mark :19
+data 0
+
+blob
+mark :20
+data 7680
+MZê       ˇˇ  ∏       @                                   Ä   ∫ ¥	Õ!∏LÕ!This program cannot be run in DOS mode.
+$       PE  L C—ÚV        ‡ " 0           &5       @                           Ä          `Ö                           ‘4  O    @  ò                   `     ú3                                                               H           .text   ,                           `.rsrc   ò   @                    @  @.reloc      `                    @  B                5      H     ƒ$  ÿ                                                         {  *"}  *{  *"}  *{  *"}  *û(  
+(  (  (  (  o  * 0 N     r  p
+ç  %¢%(  (  
+¢%r  p¢%(  ¢%r  p¢%(  o  ¢(  
+*2(  
+t  * 0 @       (  
+~  
+(  
+-
+(  
+˛+,(  o  -
+(  o  (  o  &*F{  o  
+o  
+*F{  o  
+o  
+*0 K     {  o  
+o  
+
++ (  
+{  o  
+o
+  o  
+ (  
+-Ÿﬁ ˛  o  
+‹*     +<     f{  o  
+s  o  
+*J{  o  
+o  
+*ñ{  o  
+o  
+,{  o  
+o   
+**~{  o  
+o  
+,(  o  *ñ{  o  
+o  
+,{  o  
+o!  
+**   0      {  o  
+o!  
+%
+o  *  0 n    r  po"  
+(#  
+
+{  o  
+o!  
+o  o  r  p	($  
+
++}{  o  
+o   
+ç  %¢%rM  p¢%å  ¢%rÉ  p¢%o  ¢(%  
+
+o  o  	o&  
+-#r£  po  o  ($  
+
+o  o  X{  o  
+o  
+,{  o  
+o!  
+:\ˇˇˇ{  o  
+o  
+,y{  o  
+o   
+ç  %¢%rM  p¢%å  ¢%rÉ  p¢%o  ¢(%  
+
+o  o  	o&  
+-#r£  po  o  ($  
+
+o  o  *~  *   0 [       ~  %-&~  ˛  s'  
+%Ä  s(  
+}  ~	  %-&~  ˛  s'  
+%Ä	  s(  
+}  (  
+*.s  Ä  *.s  Ä  *(  
+*s)  
+*  BSJB         v4.0.30319     l   º  #~  (  d  #Strings    å  ¿   #US L     #GUID   \  |  #Blob         W¢		   ˙3            	            )                                   ø      áy Ùy üG ô   «Á NÁ /Á €Á ßÁ ¿Á ﬁÁ ≥Z ëZ Á ky ˘M Ÿ— — vy B "
+ : Ç W (   ˘— 3 — i— ﬂ— ∑Z @— P —    h       °   >ò      uòE     ÉòE   ! ~   E    ¥ »  Œ À  ù Œ  8“  é“  •ﬁ 6 d ‚   Ê   Ê       ∆Y  P     Ü3z  X     Ü@  a     ÜH  i     ÜU  r     ÜbÚ  z     Ül˜  É     Ü3˝  ¨     ∆ g  !    Ü $ !    ÊJ  `!    Ü  U  r!    Ü ˆU  Ñ!    Ü   Ï!    Ü ÿ˝  "    Ü ÿ
+
+ "    Ü 	 ?"    Ü R  _"    Ü  à"    Ü  ∞"    Ü  *$    ñË  4$    Ü3  õ$    ë9  ß$    ë9  ≥$    Ü3  ª$    É  $ ª$    É $ $             q  “ À   q  “ À      ’   ’    I 	 3  3  3
+ ) 3 1 3 9 3 A 3 I 3 Q 3 Y 3 a 3 i 3 q 3 y 3 Å 3 ô 3 â 3 — g … ƒ# â .) Ÿ Ø- · 1 · *4 Ÿ ı :  I  ÏU  %d  ‡I  pt  z ë J  I  ≤I π  … ƒä … ƒê … ƒó … ®ù $ 3≠  3≥  3       ∆  !    % ∆ ! É v.  ?.  H.  g. # p. + É. 3 É. ; É. C p. K â. S É. [ É. c °. k À. s ÿ. s . s . { (@ É vA É v` É va É vÄ É v† É v£ É v¿ É v‡ É v Y ~ Ç       D-  Y1  p5  Ï :                    	 > N m ¢ Ä               V              Ω u                Ω —         <>9__15_0 <.ctor>b__15_0 <>9__15_1 <.ctor>b__15_1 Func`1 Stack`1 ThreadLocal`1 Int32 ClassLibrary2 <>9 <Module> sta mscorlib <>c System.Collections.Generic <state>k__BackingField <catching>k__BackingField <activity>k__BackingField get_Instance GetExceptionCode get_Message IDisposable frame MakeClone MemberwiseClone IStateAware Dispose Update GetState get_state set_state CompilerGeneratedAttribute GuidAttribute DebuggableAttribute ComVisibleAttribute AssemblyTitleAttribute AssemblyTrademarkAttribute TargetFrameworkAttribute AssemblyFileVersionAttribute AssemblyConfigurationAttribute AssemblyDescriptionAttribute InternalsVisibleToAttribute CompilationRelaxationsAttribute AssemblyProductAttribute AssemblyCopyrightAttribute AssemblyCompanyAttribute RuntimeCompatibilityAttribute get_Value value System.Threading get_catching set_catching System.Runtime.Versioning ToString Push UsingStackObj UsingStack TempStack ContextStack contextStack Peek Marshal ClassLibrary2.dll System PushIn Boolean System.Reflection Exception Zero Pop PeekTop ExceptionBuilder GetEnumerator .ctor .cctor IntPtr System.Diagnostics System.Runtime.InteropServices System.Runtime.CompilerServices DebuggingModes Equals GetExceptionPointers Concat optcat optact Object get_Current get_Count TempCount GetCount PopOut MoveNext ex ExceptionCopy op_Inequality CurrentActivity get_activity set_activity     
+  E 
+ S t a t e   w h e n   E x c e p t i o n   O c c u r r e d   :    5 
+ 	   S t e p s   F r o m   E x c e p t i o n :     
+ 	 	   A c t i v i t y :     
+ 	 	   S t a t e :       ){«XûÂΩDÉ+€
+çøHa                 
+QU   U  
+Y  Y Y        
+aU 	 a ∑z\V4‡â QUaU         ]      U( ( (          TWrapNonExceptionThrows       ClassLibrary2       Copyright ¬©  2016  ) $c7621eed-73a1-4c24-9259-b9af6a8062c0   1.0.0.0   ContextStack.Tests   ClassLibrary2.Explorables   ContextStack.Tests1  M .NETFramework,Version=v4.5.2 TFrameworkDisplayName.NET Framework 4.5.2        C—ÚV         ∏3  ∏  RSDS±mÜH‚p≥Cé˛k^¯	L/   C:\Develop\Vision\ContextStack\obj\Release\ClassLibrary2.pdb                                                                                                                                                                                                        ¸4          5                          5            _CorDllMain mscoree.dll     ˇ%                                                                                                                                                                                                                                           Ä                  0  Ä                   H   X@  <          <4   V S _ V E R S I O N _ I N F O     ΩÔ˛                 ?                         D    V a r F i l e I n f o     $    T r a n s l a t i o n       ∞ú   S t r i n g F i l e I n f o   x   0 0 0 0 0 4 b 0      C o m m e n t s       "   C o m p a n y N a m e         D   F i l e D e s c r i p t i o n     C l a s s L i b r a r y 2   0   F i l e V e r s i o n     1 . 0 . 0 . 0   D   I n t e r n a l N a m e   C l a s s L i b r a r y 2 . d l l   H   L e g a l C o p y r i g h t   C o p y r i g h t   ©     2 0 1 6   *   L e g a l T r a d e m a r k s         L   O r i g i n a l F i l e n a m e   C l a s s L i b r a r y 2 . d l l   <   P r o d u c t N a m e     C l a s s L i b r a r y 2   4   P r o d u c t V e r s i o n   1 . 0 . 0 . 0   8   A s s e m b l y   V e r s i o n   1 . 0 . 0 . 0                                                                                                                0     (5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+blob
+mark :21
+data 19968
+Microsoft C/C++ MSF 7.00
+DS         '   ∏       #                                                                                                                                                                                                                                                                                                                                                                                                                                                                           ¿ˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇ8   ˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇ 18              ˇˇ   ˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  18              ˇˇ   ˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 î.1C—ÚV   ±mÜH‚p≥Cé˛k^¯	L/                          ‹Q3                                                                                                                                                                                                                                                                                                                                                                                                                                                                     18             ˇˇˇˇ   ˇˇ     ˇˇˇˇ    ˇˇˇˇ    ˇˇˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                         18             ˇˇˇˇ   ˇˇ     ˇˇˇˇ    ˇˇˇˇ    ˇˇˇˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ¯bQ?∆”êS ¿O£°ƒEKôÈÊ“ê? ¿O£°ùÜZf”Ω*  ¯IΩÏˇ^™Má˜oIcÉ4`       FFi7>Ó∆-…–Ts°ÖÃÉ                                                                                                                                                                                                                                                                                                                                                                                                                                            Ô      Ô                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ˛Ô˛Ô   \    C:\Develop\Vision\ContextStack\UsingStack.cs  c:\develop\vision\contextstack\usingstack.cs    .   /                                                                                                                                                                                                                                                                                                                                                                                                             ‚0Ä   Í≤*’(Ö—                                                               /   (   ‚0| òJ\      .   /   e                                                                                                                                                                                                                                                                                                                                                                                                              6 *    l                    „      <.ctor>b__15_0 . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    ÿ                    È      <.ctor>b__15_1 . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $   „                     @  Äq ã Ú   $   È                     A  Äk Ö Ù                        8   X                                                                                                                                                                              6 *    <                            get_catching     6 *    x                           set_catching     6 *    ¥                           get_activity     6 *                               set_activity     2 *    (                          get_state    2 *    `                   %       set_state    . *    L      '             -       .ctor   d    '   -      
+ $USystem  $USystem.Collections.Generic " $USystem.Runtime.InteropServices  $USystem.Threading     2 …?Í∆≥Y÷Iº%	ª´¥`    M D 2                   2 *    Ë      N           	  T       ToString    P  ¥  N   T                      ret   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *    P                 
+  ¢       MakeClone  . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *    ∏      @             Æ       Dispose    . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $                          
+  Ä  $ Ú   $                         
+  Ä% ) Ú   $                           Ä" & Ú   $                           Ä' + Ú   $                           Ä$ ( Ú   $   %                        Ä) - Ú   `   -     '          T         Ä     Ä     Ä     Ä     Ä&     Ä	 W        . 	 
+ Ú   0   T     N          $         Ä     Ç !  , Ú   $   ¢                        Ä : Ú   T   Æ     @          H       #  Ä   $  Ä*   &  Ä4   (  Ä?   )  Ä s  I  5  * 	 
+ Ù             P   p   å   §   ¿   ÿ   Ù     (  @  X  p  à  †  ¥  Ã  ‰  ¸    ,  D                                                                                                                                                                                                                                                                                                                                                                                                                                                     2 *    h                    Ó       GetCount   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *    –                    ˇ       TempCount  . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    ê      K                   ExceptionCopy   ‘   \  K           X     #                    frame       . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    Ù                   [      PushIn . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    X                   t      PushIn . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    º      %             Ü      PopOut . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *                        ´      Update . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *    à      %                    PeekTop    . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              2 *                       Ô      PeekTop    . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              : *    Ù      n            	      ExceptionBuilder    Ù  ¿  n  	                     value                  temp                   unwind  "               stateAtError      . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              6 *    `                   w      get_Instance   . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              . *    ‘      [             }      .ctor  > …?Í∆≥Y÷Iº%	ª´¥`    M D 2                d  I   . *    8                   ÿ      .cctor . …?Í∆≥Y÷Iº%	ª´¥`    M D 2              Ú   $   Ó                      C  Ä! D Ú   $   ˇ                      D  Ä" ? Ú   l       K          `       G  Ä   ÓÔ˛Ä   G  Ä   I  Ä1   G  Ä<   ÓÔ˛ÄJ   K  Ä# 8        9   "     	 
+ Ú   0   [              $       O  Ä   P  Ä P 	 
+ Ú   0   t              $       S  Ä   T  Ä / 	 
+ Ú   <   Ü    %          0       W  Ä   X  Ä#   Z  Ä 2  4   Ú   <   ´              0       f  Ä   g  Ä   i  Ä 2  * 	 
+ Ú   <        %          0       l  Ä   m  Ä#   o  Ä 2  5   Ú   $   Ô                     s  Ä @ Ú   ¸   	    n                }  Ä     Ä   Ä  Ä.   Å  Ä;   ÓÔ˛Ä=   Ñ  ÄN   Ö  ÅÄ   á  Äì   â  Ä™   ä  Ä∂   å  Ä∫   Ç  Ä·   é  ÄÛ   ê  Ä  ë  Å6  ì  ÄI  ï  Ä`  ñ  Äl  ö  Ä 0    K  L      .  @  A  N  :    U  ,  .  @  A  N  :   Ú   $   w                     †  Ä ' Ú   0   }    [          $       @  Ä*   A  Ä	 ç 	 á Ú   $   ÿ                     ù  Ä	 C Ù             h   \  t  å  §  º  ÿ         8  P  h  Ä  ò  ∞  »  ‡  ¯    0  H  d  |  ê  ®  ¿                                                                                                                                                                                                                                                                                                                                                                                                  ˇˇˇˇ	/Òê  ¿  ç      E     ô     !      ]     ¡      u     …     Y      9     }     °     Õ     ˝          i     ç     Y     	     e     -     â     ë     ı      •     ˘     )     Ÿ     1     I     Å     ©     Ω     µ     ¡     Q     Â     q      •           9      A     q     !     Ò           ·     ±     Ÿ                                                                                        Ä                                                                                                                                                                               Ä                                              Ä                                                          @                  Ä                                                                                                            $   0   <   H   T   `   l   x   ê   ú   ®   ¥   ¿   Ã   ÿ   ‰      ¸          ,  8  D  P  \  h  t  Ä  å  ò  §  ∞  º  »  ‘  ‡  Ï  ¯      (  @  L                                                                                                                                                                                                                                                                                                                                                                                                                                   %        <.ctor>b__15_0     )        0600001b   %    p    <.ctor>b__15_1     )    p    0600001c   %        get_catching   )        06000002   %    @    set_catching   )    @    06000003   %    |    get_activity   )    |    06000004   %    ∏    set_activity   )    ∏    06000005   %    Ù    get_state  )    Ù    06000006   %    ,   set_state  )    ,   06000007   %    d   .ctor  )    d   06000008   %    P   ToString   )    P   06000009   %                       aåUˇˇˇˇ	/Ò                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                Ï   MakeClone  )    Ï   0600000a   %    T   Dispose    )    T   0600000b   %        GetCount   )        0600000c   %    l    TempCount  )    l    0600000d   %    ‘    ExceptionCopy  )    ‘    0600000e   %    î   PushIn     )    î   0600000f   %    ¯   PushIn     )    ¯   06000010   %    \   PopOut     )    \   06000011   %    ¿   Update     )    ¿   06000012   %    $   PeekTop    )    $   06000013   %    å   PeekTop    )    å   06000014   %    Ù   ExceptionBuilder   )    Ù   06000015   %    ¯   get_Instance   )    ¯   06000016   %    d   .ctor  )    d   06000017   %    ÿ   .cctor     )    ÿ   06000018                                                                                                                                                                                                                                                                                                            %                       -   '                    T   N                    ¢                       Æ   @                    Ó                      ˇ                        K                   [                     t                     Ü  %                   ´                        %                   Ô                     	  n                  w                     }  [                   ÿ                     „  ˇˇˇˇw	1     é á[   0  ¿  ,   L                   Ó¿        ˇˇ      ˇˇˇˇ    ˇˇ             º      @   7Ë            ContextStack.UsingStackObj 13CCB2FC     ˇˇ      ˇˇˇˇ    ˇˇ             <      ÿ   7Ë            ContextStack.UsingStack 4878A330        ˇˇ      ˇˇˇˇ    ˇˇ            
+ ‹       h    7Ë            ContextStack.UsingStack.<>c BD1C06EE    -∫.Ò                                                                                                                                       È                          ˇˇˇˇ    Ô        ˇˇˇˇ    ˇˇˇˇ                     C:\Develop\Vision\ContextStack\UsingStack.cs    ˛Ô˛Ô                  ˇˇˇˇˇˇˇˇˇˇ	 ˇˇˇˇˇˇˇˇˇˇ                                                                                                                                                                                                                                                                                                         î.1C—ÚV   ±mÜH‚p≥Cé˛k^¯	L/Z   /LinkInfo /names /src/headerblock /src/files/c:\develop\vision\contextstack\usingstack.cs                       "      
+                 ‹Q3                                                                                                                                                                                                                                                                                                                                                 ∂   8   ◊  8       Ä   Ä   \   (   X  P  Ä
+  `  ,   ÿ     !                   
+         	                                                                                                                                                                                                                                                                                                                                                                                                 "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+blob
+mark :22
+data 337
+C:\Develop\Vision\ContextStack\bin\Release\ClassLibrary2.dll
+C:\Develop\Vision\ContextStack\bin\Release\ClassLibrary2.pdb
+C:\Develop\Vision\ContextStack\obj\Release\ContextStack.csprojResolveAssemblyReference.cache
+C:\Develop\Vision\ContextStack\obj\Release\ClassLibrary2.dll
+C:\Develop\Vision\ContextStack\obj\Release\ClassLibrary2.pdb
+
+blob
+mark :23
+data 1922
+    ˇˇˇˇ          ^Microsoft.Build.Tasks.Core, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a   !Microsoft.Build.Tasks.SystemState   	fileStateSystem.Collections.Hashtable   	      System.Collections.Hashtable   
+LoadFactorVersionComparerHashCodeProviderHashSizeKeysValues   System.Collections.IComparer$System.Collections.IHashCodeProviderÏQ8?   
+
+   	   	      	      hC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Net.Http.dll   dC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Core.dll   hC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Xml.Linq.dll	   dC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Data.dll
+   aC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\mscorlib.dll   iC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\Microsoft.CSharp.dll   vC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Data.DataSetExtensions.dll   cC:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.Xml.dll   _C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\System.dll   	   	   	   	   	   	   	   	   	   	      +Microsoft.Build.Tasks.SystemState+FileState   lastModifiedassemblyNamedependenciesscatterFilesruntimeVersionframeworkName     Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+   
+v4.0.30319
+       Î≈SoH—H
+
+
+    
+v4.0.30319
+

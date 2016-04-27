@@ -1,0 +1,32 @@
+commit refs/heads/master
+mark :1000000000
+committer nchoi <> 1460125178 +0000
+data 11
+no message
+
+M 100644 :1 .#UsingStack.cs.1.1
+M 100644 :2 .#UsingStack.cs.1.2
+M 100644 :3 ContextStack.csproj
+M 100644 :4 IStateAware.cs
+M 100644 :5 UsingStack.cs
+M 100644 :6 Properties/.#AssemblyInfo.cs.1.1
+M 100644 :7 Properties/AssemblyInfo.cs
+M 100644 :8 bin/Debug/ClassLibrary2.dll
+M 100644 :9 bin/Debug/ClassLibrary2.pdb
+M 100644 :10 bin/Release/ClassLibrary2.dll
+M 100644 :11 bin/Release/ClassLibrary2.pdb
+M 100644 :12 obj/Debug/ClassLibrary2.dll
+M 100644 :13 obj/Debug/ClassLibrary2.pdb
+M 100644 :14 obj/Debug/ContextStack.csproj.FileListAbsolute.txt
+M 100644 :15 obj/Debug/ContextStack.csprojResolveAssemblyReference.cache
+M 100644 :16 obj/Debug/DesignTimeResolveAssemblyReferencesInput.cache
+M 100644 :17 obj/Debug/TemporaryGeneratedFile_036C0B5B-1481-4323-8D20-8F5ADCB23D92.cs
+M 100644 :18 obj/Debug/TemporaryGeneratedFile_5937a670-0e60-4077-877b-f7221da3dda1.cs
+M 100644 :19 obj/Debug/TemporaryGeneratedFile_E7A71F73-0F8D-4B9B-B56E-8E70B10BC5D3.cs
+M 100644 :20 obj/Release/ClassLibrary2.dll
+M 100644 :21 obj/Release/ClassLibrary2.pdb
+M 100644 :22 obj/Release/ContextStack.csproj.FileListAbsolute.txt
+M 100644 :23 obj/Release/ContextStack.csprojResolveAssemblyReference.cache
+
+reset refs/tags/arelease
+from :1000000000
