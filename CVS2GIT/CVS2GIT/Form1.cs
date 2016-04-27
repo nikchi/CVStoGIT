@@ -22,7 +22,7 @@ namespace CVS2GIT
         private void runButton_Click(object sender, EventArgs e)
         {
             Perform run = new Perform(this);
-            run.Convert();
+            run.GenDats();
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -41,6 +41,12 @@ namespace CVS2GIT
             {
                 textBox3.Text = git.SelectedPath;
             }
+        }
+
+        private void createGitButton_Click(object sender, EventArgs e)
+        {
+            Perform run = new Perform(this);
+            run.CreateGit();
         }
     }
 }

@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.button1 = new System.Windows.Forms.Button();
             this.textBox1 = new System.Windows.Forms.TextBox();
             this.textBox2 = new System.Windows.Forms.TextBox();
@@ -38,6 +39,10 @@
             this.label3 = new System.Windows.Forms.Label();
             this.runButton = new System.Windows.Forms.Button();
             this.outputBox = new System.Windows.Forms.TextBox();
+            this.createGitButton = new System.Windows.Forms.Button();
+            this.button4 = new System.Windows.Forms.Button();
+            this.textBox4 = new System.Windows.Forms.TextBox();
+            this.label4 = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // button1
@@ -126,11 +131,11 @@
             // runButton
             // 
             this.runButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.runButton.Location = new System.Drawing.Point(524, 90);
+            this.runButton.Location = new System.Drawing.Point(437, 90);
             this.runButton.Name = "runButton";
-            this.runButton.Size = new System.Drawing.Size(75, 23);
+            this.runButton.Size = new System.Drawing.Size(192, 23);
             this.runButton.TabIndex = 8;
-            this.runButton.Text = "Run";
+            this.runButton.Text = "Run cvs2git";
             this.runButton.UseVisualStyleBackColor = true;
             this.runButton.Click += new System.EventHandler(this.runButton_Click);
             // 
@@ -143,11 +148,55 @@
             this.outputBox.Size = new System.Drawing.Size(334, 313);
             this.outputBox.TabIndex = 9;
             // 
+            // createGitButton
+            // 
+            this.createGitButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.createGitButton.Location = new System.Drawing.Point(437, 119);
+            this.createGitButton.Name = "createGitButton";
+            this.createGitButton.Size = new System.Drawing.Size(192, 23);
+            this.createGitButton.TabIndex = 10;
+            this.createGitButton.Text = "Create Git repo";
+            this.createGitButton.UseVisualStyleBackColor = true;
+            this.createGitButton.Click += new System.EventHandler(this.createGitButton_Click);
+            // 
+            // button4
+            // 
+            this.button4.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.button4.Location = new System.Drawing.Point(437, 174);
+            this.button4.Name = "button4";
+            this.button4.Size = new System.Drawing.Size(192, 23);
+            this.button4.TabIndex = 11;
+            this.button4.Text = "Push to Remote";
+            this.button4.UseVisualStyleBackColor = true;
+            // 
+            // textBox4
+            // 
+            this.textBox4.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.textBox4.Location = new System.Drawing.Point(437, 148);
+            this.textBox4.Name = "textBox4";
+            this.textBox4.Size = new System.Drawing.Size(192, 20);
+            this.textBox4.TabIndex = 12;
+            // 
+            // label4
+            // 
+            this.label4.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(362, 151);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(69, 13);
+            this.label4.TabIndex = 13;
+            this.label4.Text = "Remote URL";
+            this.label4.TextAlign = System.Drawing.ContentAlignment.TopRight;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(641, 337);
+            this.Controls.Add(this.label4);
+            this.Controls.Add(this.textBox4);
+            this.Controls.Add(this.button4);
+            this.Controls.Add(this.createGitButton);
             this.Controls.Add(this.outputBox);
             this.Controls.Add(this.runButton);
             this.Controls.Add(this.label3);
@@ -159,10 +208,11 @@
             this.Controls.Add(this.textBox1);
             this.Controls.Add(this.button1);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "Form1";
-            this.Text = "Form1";
+            this.Text = "CVStoGIT";
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -180,6 +230,10 @@
         internal System.Windows.Forms.TextBox textBox2;
         internal System.Windows.Forms.TextBox textBox3;
         internal System.Windows.Forms.TextBox outputBox;
+        private System.Windows.Forms.Button createGitButton;
+        private System.Windows.Forms.Button button4;
+        internal System.Windows.Forms.TextBox textBox4;
+        private System.Windows.Forms.Label label4;
     }
 }
 
