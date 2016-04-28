@@ -146,7 +146,7 @@
             this.outputBox.Multiline = true;
             this.outputBox.Name = "outputBox";
             this.outputBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.outputBox.Size = new System.Drawing.Size(334, 323);
+            this.outputBox.Size = new System.Drawing.Size(334, 315);
             this.outputBox.TabIndex = 9;
             // 
             // createGitButton
@@ -198,7 +198,7 @@
             this.textBox5.Multiline = true;
             this.textBox5.Name = "textBox5";
             this.textBox5.ReadOnly = true;
-            this.textBox5.Size = new System.Drawing.Size(277, 132);
+            this.textBox5.Size = new System.Drawing.Size(277, 124);
             this.textBox5.TabIndex = 14;
             this.textBox5.Text = resources.GetString("textBox5.Text");
             // 
@@ -206,7 +206,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(641, 337);
+            this.ClientSize = new System.Drawing.Size(641, 339);
             this.Controls.Add(this.textBox5);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.textBox4);
