@@ -106,5 +106,40 @@ namespace CVS2GIT
                 return false;
             }
         }
+        private bool doCMD(string dir, string cmd)
+        {
+            ProcessStartInfo sinfo = new ProcessStartInfo();
+            sinfo.FileName = @"C:\Windows\System32\cmd.exe";
+            sinfo.RedirectStandardOutput = true;
+            sinfo.RedirectStandardError = true;
+            sinfo.RedirectStandardInput = true;
+            sinfo.UseShellExecute = false;
+
+            Process exec = new Process();
+            exec.StartInfo = sinfo;
+            exec.Start();
+            exec.StandardInput.WriteLine("cd " + dir + " & " + cmd);
+            exec.StandardInput.WriteLine("exit");
+
+            StreamReader reader = exec.StandardOutput;
+            string strOutput = reader.ReadToEnd();
+            outputs.Text += strOutput;
+
+            using (StreamWriter file =
+                new StreamWriter(logPath, true))
+            {
+                file.Write(strOutput);
+            }
+            exec.WaitForExit();
+
+            if (exec.ExitCode == 0)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
     }
 }
