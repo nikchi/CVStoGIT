@@ -33,7 +33,6 @@ namespace CVS2GIT
             remote = control.textBox4.Text;
         }
 
-
         internal void GenDats()
         {
             #if DEBUG
@@ -55,7 +54,6 @@ namespace CVS2GIT
             doCMD("cd " + gitDir + " & git fast-import --import-marks=git-marks.dat < " + dumpname);
             doCMD("cd " + gitDir + " & git gc --prune=now");
             doCMD("cd " + gitDir + " & git repack -a -d -f");
-
         }
 
         internal void pushGit()
@@ -63,14 +61,12 @@ namespace CVS2GIT
             doCMD("cd " + gitDir + " & git remote add origin " + remote);
             doCMD("cd " + gitDir + " & git push origin master");
         }
-
-
+        
         internal void DisplayLines(string lines)
         {
             outputs.Text += lines;
         }
-
-
+        
         private bool doCMD(string cmd)
         {
             ProcessStartInfo sinfo = new ProcessStartInfo();
