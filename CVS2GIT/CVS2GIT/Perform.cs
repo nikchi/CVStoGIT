@@ -33,6 +33,10 @@ namespace CVS2GIT
             remote = control.textBox4.Text;
         }
 
+
+        /// <summary>
+        /// Generate Dat file (oh shit whaddup)
+        /// </summary>
         internal void GenDats()
         {
             #if DEBUG

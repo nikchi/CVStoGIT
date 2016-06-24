@@ -120,10 +120,12 @@
   <data name="textBox5.Text" xml:space="preserve">
     <value>Copy CVS folder from the CVS host to your local machine
 Point CVS Root Dir to the CVS folder you want to convert
-CVS Username is self explanatory
-Git Directory is where you wish to generate your local git repo. Preferably this would be your local CVS folder
+CVS Username is self explanatory.
+Git Directory is where you wish to generate your local git repo. 
+Preferably this would be your local CVS folder
 Remote URL should point to an empty Repository
-1. Run cvs2git
+
+1. Generate .dat files
 2. Create Git repo
 3. Push to Remote</value>
   </data>
